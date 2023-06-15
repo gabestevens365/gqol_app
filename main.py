@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 from datetime import date
-from credentials_sosdb import host, port, username, password, database
+from credentials.credentials_sosdb import host, port, username, password, database
 
 
 # Function to connect to the MySQL database
