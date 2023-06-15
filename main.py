@@ -131,11 +131,11 @@ def adm_v5_reports_menu():
     choice = input("Enter your choice: ")
 
     if choice == '1':
-        adm_all_devices_reports()
+        adm_all_devices_reports_menu()
     elif choice == '2':
-        adm_os_upgrade_reports()
+        adm_os_upgrade_reports_menu()
     elif choice == '3':
-        adm_hardware_replacement_reports()
+        adm_hardware_replacement_reports_menu()
     elif choice == '0':
         main_menu()
     else:
@@ -143,9 +143,50 @@ def adm_v5_reports_menu():
         adm_v5_reports_menu()
 
 
+# All Devices Reports Menu
+def adm_all_devices_reports_menu():
+    print("=== All Devices Reports ===")
+    print("1. All-Devices Report - 365RM (This one is everything in ADM)")
+    print("2. All-Devices Report - Canteen")
+    print("3. All-Devices Report - CFGs")
+    print("4. All-Devices Report - FiveStar")
+    print("5. All-Devices Report - Canteen Canada")
+    print("0. Return to Main Menu")
+
+    choice = input("Enter your choice: ")
+
+    if choice == "1":
+        adm_all_devices_report()
+    elif choice == "2":
+        adm_all_devices_report_canteen()
+    elif choice == "3":
+        adm_all_devices_report_cfgs()
+    elif choice == "4":
+        adm_all_devices_report_fivestar()
+    elif choice == "5":
+        adm_all_devices_report_canteencanada()
+    elif choice == "0":
+        main_menu()
+    else:
+        print("Invalid Choice. Please try again.")
+        adm_all_devices_reports_menu()
+
+
+# ADM OS Upgrade Reports Menu
+def adm_os_upgrade_reports_menu():
+    # TODO: Implement the adm_os_upgrade_reports submenu
+    print("=== ADM OS Upgrade Reports ===")
+
+
+# ADM Hardware Replacement Reports Menu
+def adm_hardware_replacement_reports_menu():
+    # TODO: Implement the adm_os_upgrade_reports submenu
+    print("=== ADM Hardware Replacement Reports ===")
+
+
 # All Devices Reports
-def adm_all_devices_reports():
-    print("Generating All Devices Reports...")
+def adm_all_devices_report():
+    print("Generating The All Devices Report...")
     # MySQL query
     query_file = "./queries/v5_All_Device_Report.sql"
 
@@ -161,8 +202,68 @@ def adm_all_devices_reports():
         return
 
     # Save the result to an Excel file
-    filename = f"./reports/adm_all_devices_report"
+    filename = f"./reports/ADM_All_Devices_Report"
     sheetname = "All ADM-v5 Devices"
+    save_to_excel(result_df, filename, sheetname)
+
+
+# All Devices Report Canteen
+def adm_all_devices_report_canteen():
+    print("Generating All Devices Report for Canteen...")
+    # MySQL query
+    query_file = "./queries/v5_All_Device_Report_Canteen.sql"
+
+    # Connect to the database
+    connection = connect_to_database()
+    if connection is None:
+        return
+
+    # Execute the query
+    result_df = execute_query(connection, query_file)
+    if result_df is None:
+        connection.close()
+        return
+
+    # Save the result to an Excel file
+    filename = f"./reports/ADM_All_Devices_Report_Canteen"
+    sheetname = "All Canteen v5 Devices"
+    save_to_excel(result_df, filename, sheetname)
+
+
+# All Devices Report CFGs
+def adm_all_devices_report_cfgs():
+    print("Generating All Devices Report for CFGs...")
+    # MySQL query
+    # query_file = "./queries/v5_All_Device_Report_CFGs.sql"
+
+
+# All Devices Report FiveStar
+def adm_all_devices_report_fivestar():
+    print("Generating All Devices Report for FiveStar...")
+    # MySQL query
+    # query_file = "./queries/v5_All_Device_Report_FiveStar.sql"
+
+
+# All Devices Report CanteenCanada
+def adm_all_devices_report_canteencanada():
+    print("Generating All Devices Report for Canteen Canada...")
+    # MySQL query
+    query_file = "./queries/v5_All_Device_Report_CanteenCanada.sql"
+
+    # Connect to the database
+    connection = connect_to_database()
+    if connection is None:
+        return
+
+    # Execute the query
+    result_df = execute_query(connection, query_file)
+    if result_df is None:
+        connection.close()
+        return
+
+    # Save the result to an Excel file
+    filename = f"./reports/ADM_All_Devices_Report_CanteenCanada"
+    sheetname = "All Canteen v5 Devices"
     save_to_excel(result_df, filename, sheetname)
 
 

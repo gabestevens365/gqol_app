@@ -2,7 +2,7 @@
 *.pyc
 
 # Ignore the DB Config Files
-credentials_sosdb.py
+./credentials_sosdb.py
 
 # Ignore virtual environment directories
 venv/

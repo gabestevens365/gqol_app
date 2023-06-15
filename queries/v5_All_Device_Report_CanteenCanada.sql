@@ -153,4 +153,5 @@ FROM org o
 		GROUP BY h.KIOSKNAME, REPLACE(JSON_EXTRACT(h.BASICINFO, '$.os'),CHAR(34),"""")
 	) AS h ON k.NAME = h.KIOSKNAME
 
+WHERE o.NAME IN ('CanteenCanada', 'McMurrayCoinMachinesLtd', 'VentrexVendingServices')
 ORDER BY o.NAME, c.NAME, l.NAME, k.HWTYPE, k.NAME
