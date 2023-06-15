@@ -13,4 +13,4 @@ reports/
 .vscode/
 
 # Ignore the DB Config Files
-credentials_sosdb.py
+.credentials_sosdb.py
