@@ -1,9 +1,6 @@
 # Ignore compiled Python files
 *.pyc
 
-# Ignore the DB Config Files
-./credentials_sosdb.py
-
 # Ignore virtual environment directories
 venv/
 env/
@@ -14,3 +11,6 @@ reports/
 # Ignore IDE-specific files
 .idea/
 .vscode/
+
+# Ignore the DB Config Files
+credentials_sosdb.py
