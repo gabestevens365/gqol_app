@@ -5,12 +5,10 @@
 venv/
 env/
 
-# Ignore generated reports
+# Ignore several folders
 reports/
+credentials/
 
 # Ignore IDE-specific files
 .idea/
 .vscode/
-
-# Ignore the DB Config Files
-.credentials_sosdb.py
