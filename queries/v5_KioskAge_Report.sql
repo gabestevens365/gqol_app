@@ -1,15 +1,15 @@
 SELECT
 -- This is the v5 Kiosk-Age and OS Version Report. This will not run in Snowflake. Use reader.365rm.us
 -- This working on 2023.05.12 - G.S.
-	s.VALUE											AS  "Operation Group"
+	s.VALUE							AS  "Operation Group"
   ,sfe_division.value     			AS	"Division"
-	,''														AS	"Champion"
-	,''														AS	"Cost Center"
-	,o.SAGENUMBER1								AS  "Operation Sage ID"
-	,o.NAME												AS  "Operation Name"
-	,l.NAME												AS  "Location Name"
-	,k.NAME												AS  "Device Serial"
-	,''														AS	"VSH Generation"
+	,''								AS	"Champion"
+	,''								AS	"Cost Center"
+	,o.SAGENUMBER1					AS  "Operation Sage ID"
+	,o.NAME							AS  "Operation Name"
+	,l.NAME							AS  "Location Name"
+	,k.NAME							AS  "Device Serial"
+	,''								AS	"VSH Generation"
   ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
@@ -24,16 +24,16 @@ SELECT
 		WHEN 'MM6'              THEN 'MM6'
 		WHEN 'SODASTREAM'       THEN 'SodaStream'
   END                        		AS "Model"
-	,k.STATUS											AS	"Device Status"
-	,k.LastFullSync								AS	"Device Last Sync"
-	,ks.LASTSALE									AS	"Device Last Sale"
-	,k.DeployDate									AS  "Device Go-Live"
-	,k.DateCreated								AS	"DB Record Creation"
+	,k.STATUS						AS	"Device Status"
+	,k.LastFullSync					AS	"Device Last Sync"
+	,ks.LASTSALE					AS	"Device Last Sale"
+	,k.DeployDate					AS  "Device Go-Live"
+	,k.DateCreated					AS	"DB Record Creation"
 	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "Device Age"
 	-- Information: OS & Apps --
-	,REPLACE(h.OS,'"','')					AS  "App OS Ver"
+	,REPLACE(h.OS,'"','')			AS  "App OS Ver"
 	,REPLACE(h.systemInfo, '"', '')	AS	"systemInfo"
-	,''															AS	"CPU Product"
+	,''								AS	"CPU Product"
 
 FROM org o
 	INNER JOIN location l ON o.ID = l.ORG
@@ -85,15 +85,15 @@ WHERE k.NAME LIKE 'VSH%'
 --	AND s.VALUE = 'Canteen'
 UNION
 SELECT 
-	s.VALUE												AS  "Operation Group"
+	s.VALUE							AS  "Operation Group"
   ,sfe_division.value     			AS	"Division"
-	,''														AS	"Champion"
-	,''														AS	"Cost Center"
-	,''														AS  "Operation Sage ID"
-	,o.NAME												AS  "Operation Name"
-	,l.NAME												AS  "Location Name"
-	,k.NAME												AS  "Device Serial"
-	,''														AS	"VSH Generation"
+	,''								AS	"Champion"
+	,''								AS	"Cost Center"
+	,''								AS  "Operation Sage ID"
+	,o.NAME							AS  "Operation Name"
+	,l.NAME							AS  "Location Name"
+	,k.NAME							AS  "Device Serial"
+	,''								AS	"VSH Generation"
   ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
@@ -108,15 +108,15 @@ SELECT
 		WHEN 'MM6'              THEN 'MM6'
 		WHEN 'SODASTREAM'       THEN 'SodaStream'
   END                        		AS "Model"
-	,k.STATUS											AS	"Device Status"
-	,k.LastFullSync								AS	"Device Last Sync"
-	,ks.LASTSALE									AS	"Device Last Sale"
-	,k.DeployDate									AS  "Device Go-Live"
-	,k.DateCreated								AS	"DB Record Creation"
+	,k.STATUS						AS	"Device Status"
+	,k.LastFullSync					AS	"Device Last Sync"
+	,ks.LASTSALE					AS	"Device Last Sale"
+	,k.DeployDate					AS  "Device Go-Live"
+	,k.DateCreated					AS	"DB Record Creation"
 	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "Device Age"
-	,REPLACE(h.OS,'"','')					AS  "App OS Ver"
-	,''														AS	"systemInfo"
-	,''														AS	"CPU Product"
+	,REPLACE(h.OS,'"','')			AS  "App OS Ver"
+	,''								AS	"systemInfo"
+	,''								AS	"CPU Product"
  FROM kiosk k
 LEFT JOIN location l 
 ON UPPER(l.id)=UPPER(k.location)

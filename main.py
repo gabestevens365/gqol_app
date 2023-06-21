@@ -1,9 +1,10 @@
+from credentials.credentials_sosdb import host, port, username, password, database
+import os
+import datetime
+from datetime import date
 import mysql.connector
 import pandas as pd
-import datetime
-import os
-from datetime import date
-from credentials.credentials_sosdb import host, port, username, password, database
+import numpy as np
 
 
 # Function to connect to the MySQL database
@@ -51,7 +52,8 @@ def execute_query(conn, query_file):
         df = pd.DataFrame(decoded_results, columns=columns)
         query_endtime = datetime.datetime.now()
         query_elapsed = (query_endtime - query_starttime).total_seconds()
-        print(f"Ending the query at {query_endtime.strftime('%Y-%m-%d @ %H:%M:%S')}, elapsed time: {int(query_elapsed)} seconds.")
+        print(f"Ending the query at {query_endtime.strftime('%Y-%m-%d @ %H:%M:%S')}"
+              f", elapsed time: {int(query_elapsed)} seconds.")
         return df
     except mysql.connector.Error as error:
         print(f"Failed to execute the query: {error}")
@@ -79,7 +81,7 @@ def check_for_duplicates(filename):
             todaytime = datetime.datetime.now().time()
             formatted_time = todaytime.strftime("_%H%M%S")
             final_file_name = filename + formatted_date + formatted_time + ".xlsx"
-            print("You are saving a second copy of this file, please note your specific file name.")
+            print(f"You are saving a second copy of this file! Your specific file is: {final_file_name}")
             return final_file_name
         elif choice == "3":
             print("Overwriting the original file (if that was the wrong choice it's too late; please panic).")
@@ -92,14 +94,30 @@ def check_for_duplicates(filename):
     return final_file_name
 
 
-# Function to save a DataFrame as an Excel file with UTF-8 encoding
-def save_to_excel(df, file_name, sheet_name):
+# Function to save a DataFrame as an Excel file
+def save_to_excel(df, file_name, sheet_name, table_name):
     try:
-        # TODO: Auto-size the column widths, with column_dimensions[column_letter].width
-        # TODO: Put the data into a named Excel Table so it can use local variables in formulas
         # TODO: Add a "Summary" sheet with a pivot table explaining the data
-        df.to_excel(file_name, sheet_name=sheet_name, index=False)
-        # TODO: Re-write this to use more choices than just .XLSX, this is a terrible way to do this!
+        with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
+            # Write to DataFrame to Excel
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            worksheet = writer.sheets[sheet_name]
+
+            # Put the data into an Excel table with the default table design
+            table_style = 'Table Style Medium 2'
+            num_rows = len(df) + 1  # Add 1 for the header row
+            num_cols = len(df.columns)
+            header_row = 0
+            worksheet.add_table(0, 0, num_rows, num_cols - 1,
+                                {'name': table_name, 'style': table_style, 'header_row': header_row})
+
+            # Auto-Width for each column, with a max of 60.
+            for i, col in enumerate(df.columns):
+                column_width = max(df[col].astype(str).map(len).max(), len(col))
+                if column_width > 59:
+                    column_width = 59
+                worksheet.set_column(i, i, column_width + 1)
+
         print(f"Data saved to '{file_name}' successfully!")
     except Exception as error:
         print(f"Failed to save the data to Excel file: {error}")
@@ -169,8 +187,6 @@ def adm_all_devices_reports_menu():
     print("3. All-Devices Report - CFGs")
     print("4. All-Devices Report - FiveStar")
     print("5. All-Devices Report - Canteen Canada")
-    print("6. ")
-    print("7. ")
     print("0. Return to Main Menu")
 
     choice = input("Enter your choice: ")
@@ -219,7 +235,7 @@ def adm_hardware_replacement_reports_menu():
     print("=== ADM Hardware Replacement Reports ===")
 
 
-# All Devices Reports
+# The All-Devices Reports
 def adm_all_devices_report():
     print("Generating The All Devices Report...")
     # MySQL query
@@ -242,7 +258,8 @@ def adm_all_devices_report():
 
     # Save the result to an Excel file
     sheetname = "All ADM-v5 Devices"
-    save_to_excel(result_df, final_filename, sheetname)
+    tablename = "t.v5"
+    save_to_excel(result_df, final_filename, sheetname, tablename)
 
 
 # All Devices Report Canteen
@@ -268,7 +285,8 @@ def adm_all_devices_report_canteen():
 
     # Save the result to an Excel file
     sheetname = "All Canteen v5 Devices"
-    save_to_excel(result_df, final_filename, sheetname)
+    tablename = "t.v5"
+    save_to_excel(result_df, final_filename, sheetname, tablename)
 
 
 # All Devices Report CFGs
@@ -307,8 +325,9 @@ def adm_all_devices_report_canteencanada():
         return
 
     # Save the result to an Excel file
-    sheetname = "All Canteen v5 Devices"
-    save_to_excel(result_df, final_filename, sheetname)
+    sheetname = "All CanteenCanada v5 Devices"
+    tablename = "t.v5"
+    save_to_excel(result_df, final_filename, sheetname, tablename)
 
 
 # OS Upgrade Reports
@@ -319,7 +338,7 @@ def adm_os_upgrade_reports():
 
 # v5 KioskAge Report - All 365
 def v5_kiosk_age_report_365rm():
-    print("Generating All Devices Report for Canteen Canada...")
+    print("Generating KioskAge Report for 365rm...")
     # MySQL query
     query_file = "./queries/v5_KioskAge_Report.sql"
 
@@ -338,14 +357,28 @@ def v5_kiosk_age_report_365rm():
         connection.close()
         return
 
+    # Map the "Device Serial" column to "VSH Generation" column values
+    conditions = [
+        result_df['Device Serial'].str.contains('VSH1|VSH2|VSH3'),
+        result_df['Device Serial'].str.contains('VSH4|VSH5|VSH9'),
+        result_df['Device Serial'].str.contains('VSH6'),
+        result_df['Device Serial'].str.contains('KSK')
+    ]
+    values = ['Legacy', 'Misc', 'v5 Native', 'ReadyTouch']
+    result_df['VSH Generation'] = np.select(conditions, values, default='Misc')
+
+    # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
+    result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
+
     # Save the result to an Excel file
-    sheetname = "All VSH Kiosks"
-    save_to_excel(result_df, final_filename, sheetname)
+    sheetname = "All VSH KioskAges"
+    tablename = 't.v5'
+    save_to_excel(result_df, final_filename, sheetname, tablename)
 
 
 # v5 KioskAge Report - Canteen
 def v5_kiosk_age_report_canteen():
-    print("Generating All Devices Report for Canteen Canada...")
+    print("Generating KioskAge Report for Canteen...")
     # MySQL query
     query_file = "./queries/v5_KioskAge_Report_Canteen.sql"
 
@@ -365,8 +398,9 @@ def v5_kiosk_age_report_canteen():
         return
 
     # Save the result to an Excel file
-    sheetname = "Canteen VSH Kiosks"
-    save_to_excel(result_df, final_filename, sheetname)
+    sheetname = "Canteen VSH KioskAges"
+    tablename = "t.v5"
+    save_to_excel(result_df, final_filename, sheetname, tablename)
 
 
 # Hardware Replacement Reports
