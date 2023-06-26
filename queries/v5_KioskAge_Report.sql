@@ -4,8 +4,8 @@ SELECT
 	s.VALUE							AS  "Operation Group"
   ,sfe_division.value     			AS	"Division"
 	,''								AS	"Champion"
-	,''								AS	"Cost Center"
 	,o.SAGENUMBER1					AS  "Operation Sage ID"
+	,l.COUNTRY                      AS  "Country"
 	,o.NAME							AS  "Operation Name"
 	,l.NAME							AS  "Location Name"
 	,k.NAME							AS  "Device Serial"
@@ -81,15 +81,16 @@ FROM org o
 		GROUP BY h.KIOSKNAME, REPLACE(JSON_EXTRACT(h.BASICINFO, '$.os'),CHAR(34),"""")
 	) AS h ON k.NAME = h.KIOSKNAME
 
-WHERE k.NAME LIKE 'VSH%'
---	AND s.VALUE = 'Canteen'
+WHERE k.NAME LIKE 'VSH%' OR k.NAME like 'KSK%'
+--	AND k.HWTYPE NOT IN ('MM6', 'NANO')
+
 UNION
 SELECT 
 	s.VALUE							AS  "Operation Group"
   ,sfe_division.value     			AS	"Division"
 	,''								AS	"Champion"
-	,''								AS	"Cost Center"
 	,''								AS  "Operation Sage ID"
+	,l.COUNTRY                      AS  "Country"
 	,o.NAME							AS  "Operation Name"
 	,l.NAME							AS  "Location Name"
 	,k.NAME							AS  "Device Serial"
@@ -162,5 +163,5 @@ LEFT JOIN ( SELECT picodevicetype.Value AS picovalue, picodevicetype.name AS p_n
 			AND picodevicetype.Type = 'PICODEVICETYPE'
 	) p ON p.p_name=k.id
 WHERE location IS NULL
-	AND k.NAME LIKE 'VSH%'
---	AND s.VALUE = 'Canteen'
+	AND k.NAME LIKE 'VSH%' OR k.NAME like 'KSK%'
+--	AND k.HWTYPE NOT IN ('MM6', 'NANO')

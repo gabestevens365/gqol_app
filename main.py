@@ -231,7 +231,7 @@ def adm_os_upgrade_reports_menu():
 
 # ADM Hardware Replacement Reports Menu
 def adm_hardware_replacement_reports_menu():
-    # TODO: Implement the adm_os_upgrade_reports submenu
+    # TODO: Implement the adm_hardware_replacement_reports submenu
     print("=== ADM Hardware Replacement Reports ===")
 
 
@@ -369,6 +369,21 @@ def v5_kiosk_age_report_365rm():
 
     # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
     result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
+
+    # Exclude specific CPU Products from the dataframe
+    excluded_cpu_products = [
+        'Elo AiO',
+        'Elo AiO X3',
+        'EloPOS E2/S2/H2',
+        'EloPOS E3/S3/H3',
+        'MMH81AP-FH',
+        'OptiPlex 7010',
+        'S11G',
+        'S11M',
+        'W11G',
+        'W11HS2'
+    ]
+    result_df = result_df[~result_df['CPU Product'].isin(excluded_cpu_products)]
 
     # Save the result to an Excel file
     sheetname = "All VSH KioskAges"
