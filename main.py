@@ -103,14 +103,6 @@ def save_to_excel(df, file_name, sheet_name, table_name):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
             worksheet = writer.sheets[sheet_name]
 
-            # Put the data into an Excel table with the default table design
-            table_style = 'Table Style Medium 2'
-            num_rows = len(df) + 1  # Add 1 for the header row
-            num_cols = len(df.columns)
-            header_row = 0
-            worksheet.add_table(0, 0, num_rows, num_cols - 1,
-                                {'name': table_name, 'style': table_style, 'header_row': header_row})
-
             # Auto-Width for each column, with a max of 60.
             for i, col in enumerate(df.columns):
                 column_width = max(df[col].astype(str).map(len).max(), len(col))
@@ -370,6 +362,9 @@ def v5_kiosk_age_report_365rm():
     # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
     result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
 
+    # Delete the "SystemInfo" column
+    result_df.drop('systemInfo', axis=1, inplace=True)
+
     # Exclude specific CPU Products from the dataframe
     excluded_cpu_products = [
         'Elo AiO',
@@ -385,6 +380,9 @@ def v5_kiosk_age_report_365rm():
     ]
     result_df = result_df[~result_df['CPU Product'].isin(excluded_cpu_products)]
 
+    # Sort the DataFrame by multiple columns
+    result_df = result_df.sort_values(by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
+
     # Save the result to an Excel file
     sheetname = "All VSH KioskAges"
     tablename = 't.v5'
@@ -393,29 +391,14 @@ def v5_kiosk_age_report_365rm():
 
 # v5 KioskAge Report - Canteen
 def v5_kiosk_age_report_canteen():
-    print("Generating KioskAge Report for Canteen...")
-    # MySQL query
-    query_file = "./queries/v5_KioskAge_Report_Canteen.sql"
-
-    # Check to see whether the file already exists, first.
-    filename = f"./reports/v5_KioskAge_Report-Canteen"
-    final_filename = check_for_duplicates(filename)
-
-    # Connect to the database
-    connection = connect_to_database()
-    if connection is None:
-        return
-
-    # Execute the query
-    result_df = execute_query(connection, query_file)
-    if result_df is None:
-        connection.close()
-        return
-
-    # Save the result to an Excel file
-    sheetname = "Canteen VSH KioskAges"
-    tablename = "t.v5"
-    save_to_excel(result_df, final_filename, sheetname, tablename)
+    # This report is a subset of the KioskAge Report - All 365 report
+    print("Generating the KioskAge Report for Canteen...")
+    # First let's check to see if the All 365 version of the report already exists.
+        # If yes, choose and open the newest version of it, and load the data as a dataframe.
+        # If no, run it, then open it, and load the data as a dataframe.
+    # Remove all operator groups EXCEPT "Canteen", "Canteen_Dining", and "CompassGroup"
+    # Re-sort the data
+    # Save the dataframe as a new KioskAge Report - Canteen file.
 
 
 # Hardware Replacement Reports
