@@ -61,7 +61,7 @@ def execute_query(conn, query_file):
 
 
 # Function to save a DataFrame as an Excel file
-def save_to_excel(df, file_name, sheet_name, table_name):
+def save_to_excel(df, file_name, sheet_name):
     try:
         # TODO: Add a "Summary" sheet with a pivot table explaining the data
         with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
@@ -144,7 +144,7 @@ def adm_all_devices_reports_menu():
     choice = input("Enter your choice: ")
 
     if choice == "1":
-        adm_all_devices_report()
+        alldevices_report_365rm_builder()
     elif choice == "0":
         main_menu()
     else:
@@ -163,7 +163,7 @@ def adm_os_upgrade_reports_menu():
     choice = input("Enter your choice: ")
 
     if choice == "1":
-        v5_kiosk_age_report_365rm()
+        kiosk_age_report_365rm_builder()
     elif choice == "2":
         v5_kiosk_age_report_canteen()
     elif choice == "0":
@@ -174,7 +174,7 @@ def adm_os_upgrade_reports_menu():
 
 
 # The All-Devices Reports
-def adm_all_devices_report():
+def alldevices_report_365rm_builder():
     today = date.today()
     formatted_date = today.strftime("%Y-%m-%d")
 
@@ -186,9 +186,7 @@ def adm_all_devices_report():
     report_date = formatted_date
     report_time = formatted_time
     report_ext = ".xlsx"
-
-    # MySQL query
-    query_file = "./queries/v5_All_Device_Report.sql"
+    final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
 
     print(f"{report_name} for {report_date} at {report_time}...")
 
@@ -196,39 +194,24 @@ def adm_all_devices_report():
     report_exists = find_latest_report(report_path, report_name, report_date)
     if report_exists == None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
+        alldevice_report_365rm_v5_writer(final_file_name)
     else:
         print(f"{report_path}{report_exists} already exists!\n")
         choice = input("Do you want to generate a new copy? [Y/N]: ")
         choice = choice.upper()
 
-    if choice == "Y":
-        print(f"Generating a new copy of {report_name} for {report_date}
-
-        # Connect to the database
-        connection = connect_to_database()
-        if connection is None:
-            return
-
-        # Execute the query
-        result_df = execute_query(connection, query_file)
-        if result_df is None:
-            connection.close()
-            return
-
-        # Save the result to an Excel file
-        sheetname = "All ADM-v5 Devices"
-        tablename = "t.v5"
-        final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
-        save_to_excel(result_df, final_file_name, sheetname, tablename)
-    elif choice == "N":
-        main_menu()
-    else:
-        print("Invalid Choice.")
-        adm_all_devices_reports_menu()
+        if choice == "Y":
+            print(f"Generating a new copy of {report_name} for {report_date}.")
+            alldevice_report_365rm_v5_writer(final_file_name)
+        elif choice == "N":
+            main_menu()
+        else:
+            print("Invalid Choice.")
+            adm_all_devices_reports_menu()
 
 
 # KioskAge Report - All 365
-def v5_kiosk_age_report_365rm():
+def kiosk_age_report_365rm_builder():
     # Let's get some date and time variables.
     today = date.today()
     current_time = datetime.now()
@@ -241,7 +224,7 @@ def v5_kiosk_age_report_365rm():
     report_date = formatted_date
     report_time = formatted_time
     report_ext = ".xlsx"
-    query_file = "./queries/v5_KioskAge_Report.sql"
+    final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
 
     # Announce the report we're starting to generate.
     print(f"{report_name} for {report_date} at {formatted_time}...")
@@ -250,70 +233,99 @@ def v5_kiosk_age_report_365rm():
     report_exists = find_latest_report(report_path, report_name, report_date)
     if report_exists == None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
+        kiosk_age_report_365rm_writer(final_file_name)
     else:
         print(f"{report_path}{report_exists} already exists!\n")
         choice = input("Do you want to generate a new copy? [Y/N]: ")
         choice = choice.upper()
 
-    if choice == "Y":
-        print(f"Generating a new copy of {report_name} for {report_date}
+        if choice == "Y":
+            print(f"Generating a new copy of {report_name} for {report_date}.")
+            kiosk_age_report_365rm_writer(final_file_name)
+        elif choice == "N":
+            main_menu()
+        else:
+            print("Invalid Choice.")
+            adm_os_upgrade_reports_menu()
 
-        # Connect to the database
-        connection = connect_to_database()
-        if connection is None:
-            return
 
-        # Execute the query
-        result_df = execute_query(connection, query_file)
-        if result_df is None:
-            connection.close()
-            return
+# AllDevices Report - 365rm - v5 - Builder
+def alldevice_report_365rm_v5_writer(filename):
+    # MySQL query
+    query_file = "./queries/v5_All_Device_Report.sql"
 
-        # Map the "Device Serial" column to "VSH Generation" column values
-        conditions = [
-            result_df['Device Serial'].str.contains('VSH1|VSH2|VSH3'),
-            result_df['Device Serial'].str.contains('VSH4|VSH5|VSH9'),
-            result_df['Device Serial'].str.contains('VSH6'),
-            result_df['Device Serial'].str.contains('KSK')
-        ]
-        values = ['Legacy', 'Misc', 'v5 Native', 'ReadyTouch']
-        result_df['VSH Generation'] = np.select(conditions, values, default='Misc')
+    # Connect to the database
+    connection = connect_to_database()
+    if connection is None:
+        return
 
-        # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
-        result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
+    # Execute the query
+    result_df = execute_query(connection, query_file)
+    if result_df is None:
+        connection.close()
+        return
 
-        # Delete the "SystemInfo" column
-        result_df.drop('systemInfo', axis=1, inplace=True)
+    # Save the result to an Excel file
+    sheetname = "All ADM-v5 Devices"
+    tablename = "t.v5"
+    save_to_excel(result_df, filename, sheetname)
 
-        # Exclude specific CPU Products from the dataframe
-        excluded_cpu_products = [
-            'Elo AiO',
-            'Elo AiO X3',
-            'EloPOS E2/S2/H2',
-            'EloPOS E3/S3/H3',
-            'MMH81AP-FH',
-            'OptiPlex 7010',
-            'S11G',
-            'S11M',
-            'W11G',
-            'W11HS2'
-        ]
-        result_df = result_df[~result_df['CPU Product'].isin(excluded_cpu_products)]
 
-        # Sort the DataFrame by multiple columns
-        result_df = result_df.sort_values(
-            by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
+# KioskAge Report - 365rm - Writer
+def kiosk_age_report_365rm_writer(filename):
+    # Get the SQL query
+    query_file = "./queries/v5_KioskAge_Report.sql"
 
-        # Save the result to an Excel file
-        sheetname = "All VSH KioskAges"
-        tablename = 't.v5'
-        final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
-        save_to_excel(result_df, final_file_name, sheetname, tablename)
-    elif choice == "N":
-        main_menu()
-    else:
-        print("Invalid Choice.")
-        adm_os_upgrade_reports_menu()
+    # Connect to the database
+    connection = connect_to_database()
+    if connection is None:
+        return
+
+    # Execute the query
+    result_df = execute_query(connection, query_file)
+    if result_df is None:
+        connection.close()
+        return
+
+    # Map the "Device Serial" column to "VSH Generation" column values
+    conditions = [
+        result_df['Device Serial'].str.contains('VSH1|VSH2|VSH3'),
+        result_df['Device Serial'].str.contains('VSH4|VSH5|VSH9'),
+        result_df['Device Serial'].str.contains('VSH6'),
+        result_df['Device Serial'].str.contains('KSK')
+    ]
+    values = ['Legacy', 'Misc', 'v5 Native', 'ReadyTouch']
+    result_df['VSH Generation'] = np.select(conditions, values, default='Misc')
+
+    # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
+    result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
+
+    # Delete the "SystemInfo" column
+    result_df.drop('systemInfo', axis=1, inplace=True)
+
+    # Exclude specific CPU Products from the dataframe
+    excluded_cpu_products = [
+        'Elo AiO',
+        'Elo AiO X3',
+        'EloPOS E2/S2/H2',
+        'EloPOS E3/S3/H3',
+        'MMH81AP-FH',
+        'OptiPlex 7010',
+        'S11G',
+        'S11M',
+        'W11G',
+        'W11HS2'
+    ]
+    result_df = result_df[~result_df['CPU Product'].isin(excluded_cpu_products)]
+
+    # Sort the DataFrame by multiple columns
+    result_df = result_df.sort_values(
+        by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
+
+    # Save the result to an Excel file
+    sheetname = "All VSH KioskAges"
+    tablename = 't.v5'
+    save_to_excel(result_df, filename, sheetname)
 
 
 # v5 KioskAge Report - Canteen
