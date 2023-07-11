@@ -4,11 +4,11 @@ SELECT
 	s.VALUE							AS  "Operation Group"
     ,sfe_division.value     		AS	"Division"
 	,''								AS	"Champion"
-	,l.COUNTRY                      AS  "Country"
+    ,o.SAGENUMBER1                  AS	"Sage ID"
+	,o.COUNTRY                      AS  "Country"
 	,o.NAME							AS  "Operation Name"
 	,l.NAME							AS  "Location Name"
 	,k.NAME							AS  "Device Serial"
-	,''								AS	"VSH Generation"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
@@ -22,13 +22,13 @@ SELECT
 		WHEN 'BEACON'           THEN 'Beacon'
 		WHEN 'MM6'              THEN 'MM6'
 		WHEN 'SODASTREAM'       THEN 'SodaStream'
-    END                        		AS "Model"
+    END                        		AS  "Model"
 	,k.STATUS						AS	"Device Status"
 	,k.LastFullSync					AS	"Device Last Sync"
 	,ks.LASTSALE					AS	"Device Last Sale"
 	,k.DeployDate					AS  "Device Go-Live"
 	,k.DateCreated					AS	"DB Record Creation"
-	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "Device Age"
+	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "ADM Device Age"
 	-- Information: OS & Apps --
 	,k.OSVERSION                    AS  "OS Version"
 	,REPLACE(h.systemInfo, '"', '')	AS	"systemInfo"
@@ -86,18 +86,18 @@ FROM org o
 	) AS h ON k.NAME = h.KIOSKNAME
 
 WHERE k.NAME LIKE 'VSH%' OR k.NAME like 'KSK%'
-	AND k.HWTYPE NOT IN ('MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+	AND k.HWTYPE NOT IN ('BEACON','MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
 
 UNION
 SELECT
 	s.VALUE							AS  "Operation Group"
     ,sfe_division.value    			AS	"Division"
 	,''								AS	"Champion"
-	,l.COUNTRY                      AS  "Country"
+	,o.COUNTRY                      AS  "Country"
+    ,o.SAGENUMBER1                  AS	"Sage ID"
 	,o.NAME							AS  "Operation Name"
 	,l.NAME							AS  "Location Name"
 	,k.NAME							AS  "Device Serial"
-	,''								AS	"VSH Generation"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
@@ -117,7 +117,7 @@ SELECT
 	,ks.LASTSALE					AS	"Device Last Sale"
 	,k.DeployDate					AS  "Device Go-Live"
 	,k.DateCreated					AS	"DB Record Creation"
-	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "Device Age"
+	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "ADM Device Age"
 	-- Information: OS & Apps --
 	,k.OSVERSION                    AS  "OS Version"
 	,''								AS	"systemInfo"
@@ -160,4 +160,4 @@ FROM kiosk k
 
 WHERE location IS NULL
 	AND k.NAME LIKE 'VSH%' OR k.NAME like 'KSK%'
-	AND k.HWTYPE NOT IN ('MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+	AND k.HWTYPE NOT IN ('BEACON', 'MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')

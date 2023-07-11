@@ -27,7 +27,7 @@ def connect_to_database():
 # Function to execute a SQL query and return the results as a pandas DataFrame
 def execute_query(conn, query_file):
     query_starttime = datetime.now()
-    print(f"Starting the query at {query_starttime.strftime('%Y-%m-%d @ %H:%M:%S')}")
+    print(f"Starting the {query_file} query at {query_starttime.strftime('%Y-%m-%d @ %H:%M:%S')}")
     try:
         cursor = conn.cursor()
 
@@ -52,29 +52,32 @@ def execute_query(conn, query_file):
         df = pd.DataFrame(decoded_results, columns=columns)
         query_endtime = datetime.now()
         query_elapsed = (query_endtime - query_starttime).total_seconds()
-        print(f"Ending the query at {query_endtime.strftime('%Y-%m-%d @ %H:%M:%S')}"
+        print(f"Ending the {query_file} query at {query_endtime.strftime('%Y-%m-%d @ %H:%M:%S')}"
               f", elapsed time: {int(query_elapsed)} seconds.")
         return df
     except mysql.connector.Error as error:
-        print(f"Failed to execute the query: {error}")
+        print(f"Failed to execute the {query_file} query: {error}")
         return None
 
 
 # Function to save a DataFrame as an Excel file
-def save_to_excel(df, file_name, sheet_name):
+def save_to_excel(dataframes, file_name, sheet_names):
     try:
-        # TODO: Add a "Summary" sheet with a pivot table explaining the data
-        with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
-            # Write to DataFrame to Excel
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-            worksheet = writer.sheets[sheet_name]
+        if len(dataframes) != len(sheet_names):
+            raise ValueError("Number of dataframes and sheet names must be equal.")
 
-            # Auto-Width for each column, with a max of 60.
-            for i, col in enumerate(df.columns):
-                column_width = max(df[col].astype(str).map(len).max(), len(col))
-                if column_width > 59:
-                    column_width = 59
-                worksheet.set_column(i, i, column_width + 1)
+        with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
+            for df, sheet_name in zip(dataframes, sheet_names):
+                # Write to DataFrames to Excel
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+                worksheet = writer.sheets[sheet_name]
+
+                # Auto-Width for each column, with a max of 60.
+                for i, col in enumerate(df.columns):
+                    column_width = max(df[col].astype(str).map(len).max(), len(col))
+                    if column_width > 59:
+                        column_width = 59
+                    worksheet.set_column(i, i, column_width + 1)
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -90,7 +93,8 @@ def find_latest_report(report_path, report_name, report_date):
 
     if matching_files:
         # Sort the matching_files based on their modification time (newest first)
-        sorted_files = sorted(matching_files, key=lambda f: os.path.getmtime(os.path.join(report_path, f)), reverse=True)
+        sorted_files = sorted(matching_files, key=lambda f: os.path.getmtime(os.path.join(report_path, f)),
+                              reverse=True)
         latest_report = sorted_files[0]
         return latest_report
     else:
@@ -156,16 +160,13 @@ def adm_all_devices_reports_menu():
 def adm_os_upgrade_reports_menu():
     # TODO: Implement the adm_os_upgrade_reports submenu
     print("=== ADM OS Upgrade Reports ===")
-    print("1. Kiosk-Age Report - 365RM")
-    print("2. Kiosk-Age Report - Canteen")
+    print("1. Kiosk-Age Report")
     print("0. Return to Main Menu")
 
     choice = input("Enter your choice: ")
 
     if choice == "1":
-        kiosk_age_report_365rm_builder()
-    elif choice == "2":
-        v5_kiosk_age_report_canteen()
+        kiosk_age_report_builder()
     elif choice == "0":
         main_menu()
     else:
@@ -211,7 +212,7 @@ def alldevices_report_365rm_builder():
 
 
 # KioskAge Report - All 365
-def kiosk_age_report_365rm_builder():
+def kiosk_age_report_builder():
     # Let's get some date and time variables.
     today = date.today()
     current_time = datetime.now()
@@ -233,7 +234,7 @@ def kiosk_age_report_365rm_builder():
     report_exists = find_latest_report(report_path, report_name, report_date)
     if report_exists == None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
-        kiosk_age_report_365rm_writer(final_file_name)
+        kiosk_age_report_writer(final_file_name)
     else:
         print(f"{report_path}{report_exists} already exists!\n")
         choice = input("Do you want to generate a new copy? [Y/N]: ")
@@ -241,7 +242,7 @@ def kiosk_age_report_365rm_builder():
 
         if choice == "Y":
             print(f"Generating a new copy of {report_name} for {report_date}.")
-            kiosk_age_report_365rm_writer(final_file_name)
+            kiosk_age_report_writer(final_file_name)
         elif choice == "N":
             main_menu()
         else:
@@ -267,44 +268,42 @@ def alldevice_report_365rm_v5_writer(filename):
 
     # Save the result to an Excel file
     sheetname = "All ADM-v5 Devices"
-    tablename = "t.v5"
     save_to_excel(result_df, filename, sheetname)
 
 
 # KioskAge Report - 365rm - Writer
-def kiosk_age_report_365rm_writer(filename):
+def kiosk_age_report_writer(filename):
     # Get the SQL query
-    query_file = "./queries/v5_KioskAge_Report.sql"
+    query_file_v5 = "./queries/KioskAge_v5_Report.sql"
+    query_file_rt = "./queries/KioskAge_RT_Report.sql"
 
     # Connect to the database
     connection = connect_to_database()
     if connection is None:
         return
 
-    # Execute the query
-    result_df = execute_query(connection, query_file)
-    if result_df is None:
+    # Execute the v5 query
+    result_v5_df = execute_query(connection, query_file_v5)
+    if result_v5_df is None:
         connection.close()
         return
 
-    # Map the "Device Serial" column to "VSH Generation" column values
-    conditions = [
-        result_df['Device Serial'].str.contains('VSH1|VSH2|VSH3'),
-        result_df['Device Serial'].str.contains('VSH4|VSH5|VSH9'),
-        result_df['Device Serial'].str.contains('VSH6'),
-        result_df['Device Serial'].str.contains('KSK')
-    ]
-    values = ['Legacy', 'Misc', 'v5 Native', 'ReadyTouch']
-    result_df['VSH Generation'] = np.select(conditions, values, default='Misc')
+    # Execute the ReadyTouch query
+    result_rt_df = execute_query(connection, query_file_rt)
+    if result_rt_df is None:
+        connection.close()
+        return
 
     # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
-    result_df['CPU Product'] = result_df['systemInfo'].str.extract(r'product=([^|]+)')
+    result_v5_df['CPU Product'] = result_v5_df['systemInfo'].str.extract(r'product=([^|]+)')
+    result_rt_df['CPU Product'] = result_rt_df['systemInfo'].str.extract(r'product=([^|]+)')
 
     # Delete the "SystemInfo" column
-    result_df.drop('systemInfo', axis=1, inplace=True)
+    result_v5_df.drop('systemInfo', axis=1, inplace=True)
+    result_rt_df.drop('systemInfo', axis=1, inplace=True)
 
     # Exclude specific CPU Products from the dataframe
-    excluded_cpu_products = [
+    excluded_v5_cpu_products = [
         'Elo AiO',
         'Elo AiO X3',
         'EloPOS E2/S2/H2',
@@ -316,29 +315,49 @@ def kiosk_age_report_365rm_writer(filename):
         'W11G',
         'W11HS2'
     ]
-    result_df = result_df[~result_df['CPU Product'].isin(excluded_cpu_products)]
+    excluded_rt_cpu_products = [
+        'S11G',
+        'W8LPL',
+        'EloPOS E3/S3/H3',
+        'EloPOS E2/S2/H2',
+        'To Be Filled By O.E.M.'
+    ]
+    result_v5_df = result_v5_df[~result_v5_df['CPU Product'].isin(excluded_v5_cpu_products)]
+    result_rt_df = result_rt_df[~result_rt_df['CPU Product'].isin(excluded_rt_cpu_products)]
+
+    # Shorten some long column string values
+    result_rt_df['Printer'] = result_rt_df['Printer'].str.split(' :', n=1).str[0]
+    result_rt_df['OS Version'] = result_rt_df['OS Version'].str.split('.', n=2).str[:2].str.join('.')
+
+    # ReadyTouch Report -- Add a new column "Path Forward" and fill it with relevant values.
+    result_rt_df['Path Forward'] = ""
+    result_rt_df.loc[result_rt_df['CPU Product'].isnull() | (
+                result_rt_df['CPU Product'] == ""), 'Path Forward'] = "Investigate (Not in Dash)"
+    result_rt_df.loc[result_rt_df['CPU Product'].str.contains("^Opti", na=False), 'Path Forward'] = \
+        "Replace (CPU Not Eligible)"
+    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 14.04", 'Path Forward'] = "Upgrade (Ubuntu 14.04)"
+    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 20.04", 'Path Forward'] = "Up-to-Date (Ubuntu 20.04)"
 
     # Sort the DataFrame by multiple columns
-    result_df = result_df.sort_values(
+    result_v5_df = result_v5_df.sort_values(
         by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
+    result_rt_df = result_rt_df.sort_values(
+        by=["Division", "Operation Name", "Location Name", "Model"]
+    )
+
+    # v5 Report -- Add the new columns "Sage Go-Live", "Device Age", and "Resolution Path"
+    result_v5_df['Sage Go-Live'], result_v5_df['Device Age'], result_v5_df['Resolution Path'] = "", "", ""
+    csv_file_path = "./queries/SageData_v5_golives.csv"
+    sage_data_df = pd.read_csv(csv_file_path)
+
+    # TODO: Figure out how to merge these things together without generating errors.
+    #merged_df = pd.merge(result_v5_df, sage_data_df[['SerialNumber', 'WentLiveOn']], how='left', left_on='Device Serial', right_on='SerialNumber')
+    #result_v5_df.loc[merged_df['WentLiveOn'].notnull(), 'Sage Go-Live'] = merged_df['WentLiveOn']
 
     # Save the result to an Excel file
-    sheetname = "All VSH KioskAges"
-    tablename = 't.v5'
-    save_to_excel(result_df, filename, sheetname)
-
-
-# v5 KioskAge Report - Canteen
-def v5_kiosk_age_report_canteen():
-    # This report is a subset of the KioskAge Report - All 365 report
-    print("Generating the KioskAge Report for Canteen...")
-    # First let's check to see if the All 365 version of the report already exists.
-    # Check to see whether the file already exists, first.
-        # If yes, choose and open the newest version of it, and load the data as a dataframe.
-        # If no, run it, then open it, and load the data as a dataframe.
-    # Remove all operator groups EXCEPT "Canteen", "Canteen_Dining", and "CompassGroup"
-    # Re-sort the data
-    # Save the dataframe as a new KioskAge Report - Canteen file.
+    sheet1 = "v5 KioskAges"
+    sheet2 = "RT KioskAges"
+    save_to_excel([result_v5_df, result_rt_df], filename, [sheet1, sheet2])
 
 
 # Entry point of the program
