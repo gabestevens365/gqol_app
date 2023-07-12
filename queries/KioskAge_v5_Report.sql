@@ -27,7 +27,6 @@ SELECT
 	,k.LastFullSync					AS	"Device Last Sync"
 	,ks.LASTSALE					AS	"Device Last Sale"
 	,k.DeployDate					AS  "Device Go-Live"
-	,k.DateCreated					AS	"DB Record Creation"
 	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "ADM Device Age"
 	-- Information: OS & Apps --
 	,k.OSVERSION                    AS  "OS Version"
@@ -116,7 +115,6 @@ SELECT
 	,k.LastFullSync					AS	"Device Last Sync"
 	,ks.LASTSALE					AS	"Device Last Sale"
 	,k.DeployDate					AS  "Device Go-Live"
-	,k.DateCreated					AS	"DB Record Creation"
 	,TIMESTAMPDIFF(YEAR, k.DeployDate, NOW() ) AS "ADM Device Age"
 	-- Information: OS & Apps --
 	,k.OSVERSION                    AS  "OS Version"

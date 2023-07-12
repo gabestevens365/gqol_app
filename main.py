@@ -4,7 +4,6 @@ import datetime
 from datetime import date, datetime
 import mysql.connector
 import pandas as pd
-import numpy as np
 
 
 # Function to connect to the MySQL database
@@ -338,21 +337,33 @@ def kiosk_age_report_writer(filename):
     result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 14.04", 'Path Forward'] = "Upgrade (Ubuntu 14.04)"
     result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 20.04", 'Path Forward'] = "Up-to-Date (Ubuntu 20.04)"
 
-    # Sort the DataFrame by multiple columns
+    # Sort the DataFrames by multiple columns
     result_v5_df = result_v5_df.sort_values(
         by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
     result_rt_df = result_rt_df.sort_values(
-        by=["Division", "Operation Name", "Location Name", "Model"]
-    )
+        by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
 
     # v5 Report -- Add the new columns "Sage Go-Live", "Device Age", and "Resolution Path"
     result_v5_df['Sage Go-Live'], result_v5_df['Device Age'], result_v5_df['Resolution Path'] = "", "", ""
     csv_file_path = "./queries/SageData_v5_golives.csv"
     sage_data_df = pd.read_csv(csv_file_path)
 
-    # TODO: Figure out how to merge these things together without generating errors.
-    #merged_df = pd.merge(result_v5_df, sage_data_df[['SerialNumber', 'WentLiveOn']], how='left', left_on='Device Serial', right_on='SerialNumber')
-    #result_v5_df.loc[merged_df['WentLiveOn'].notnull(), 'Sage Go-Live'] = merged_df['WentLiveOn']
+    # Merge the result_v5_df and sage_data_df on the 'Device Serial' and 'SerialNumber' columns
+    merged_df = pd.merge(result_v5_df, sage_data_df[['SerialNumber', 'WentLiveOn']], how='left',
+                         left_on='Device Serial', right_on='SerialNumber')
+
+    # Update the 'Sage Go-Live' column in result_v5_df
+    # REFACTORING NOTE: Dear self, when you see this you are going to try to consolidate and shrink it to:
+    # result_v5_df.loc[merged_df['WentLiveOn'].notnull(), 'Sage Go-Live'] = merged_df.loc[
+    #    merged_df['WentLiveOn'].notnull(), 'WentLiveOn']
+    # But that won't work. You'll get a TypeError that you'll spend hours trying to figure out.
+    # Using the isin() create a boolean mask that ignores all the NULL values and puts the real values into a list.
+    result_v5_df.loc[result_v5_df['Device Serial'].isin(
+        merged_df.loc[merged_df['WentLiveOn'].notnull(), 'Device Serial']), 'Sage Go-Live'] = merged_df.loc[
+        merged_df['WentLiveOn'].notnull(), 'WentLiveOn'].values.tolist()
+
+    # TODO: Fill in the "Device Age" column.
+    # TODO: Fill in the "Path Forward" column.
 
     # Save the result to an Excel file
     sheet1 = "v5 KioskAges"
