@@ -267,7 +267,7 @@ def alldevice_report_365rm_v5_writer(filename):
 
     # Save the result to an Excel file
     sheetname = "All ADM-v5 Devices"
-    save_to_excel(result_df, filename, sheetname)
+    save_to_excel([result_df], filename, [sheetname])
 
 
 # KioskAge Report - 365rm - Writer
@@ -293,14 +293,6 @@ def kiosk_age_report_writer(filename):
         connection.close()
         return
 
-    # Extract the CPU from the "systemInfo" column and fill in the "CPU Product" column with it.
-    result_v5_df['CPU Product'] = result_v5_df['systemInfo'].str.extract(r'product=([^|]+)')
-    result_rt_df['CPU Product'] = result_rt_df['systemInfo'].str.extract(r'product=([^|]+)')
-
-    # Delete the "SystemInfo" column
-    result_v5_df.drop('systemInfo', axis=1, inplace=True)
-    result_rt_df.drop('systemInfo', axis=1, inplace=True)
-
     # Exclude specific CPU Products from the dataframe
     excluded_v5_cpu_products = [
         'Elo AiO',
@@ -324,47 +316,69 @@ def kiosk_age_report_writer(filename):
     result_v5_df = result_v5_df[~result_v5_df['CPU Product'].isin(excluded_v5_cpu_products)]
     result_rt_df = result_rt_df[~result_rt_df['CPU Product'].isin(excluded_rt_cpu_products)]
 
-    # Shorten some long column string values
-    result_rt_df['Printer'] = result_rt_df['Printer'].str.split(' :', n=1).str[0]
-    result_rt_df['OS Version'] = result_rt_df['OS Version'].str.split('.', n=2).str[:2].str.join('.')
-
-    # ReadyTouch Report -- Add a new column "Path Forward" and fill it with relevant values.
-    result_rt_df['Path Forward'] = ""
-    result_rt_df.loc[result_rt_df['CPU Product'].isnull() | (
-                result_rt_df['CPU Product'] == ""), 'Path Forward'] = "Investigate (Not in Dash)"
-    result_rt_df.loc[result_rt_df['CPU Product'].str.contains("^Opti", na=False), 'Path Forward'] = \
-        "Replace (CPU Not Eligible)"
-    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 14.04", 'Path Forward'] = "Upgrade (Ubuntu 14.04)"
-    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 20.04", 'Path Forward'] = "Up-to-Date (Ubuntu 20.04)"
-
-    # Sort the DataFrames by multiple columns
-    result_v5_df = result_v5_df.sort_values(
-        by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
-    result_rt_df = result_rt_df.sort_values(
-        by=["Operation Group", "Division", "Operation Name", "Location Name", "Model"])
-
     # v5 Report -- Add the new columns "Sage Go-Live", "Device Age", and "Resolution Path"
     result_v5_df['Sage Go-Live'], result_v5_df['Device Age'], result_v5_df['Resolution Path'] = "", "", ""
+
+    # Import the Sage Data and convert Excel dates to datetime objects, handling NaN values
     csv_file_path = "./queries/SageData_v5_golives.csv"
     sage_data_df = pd.read_csv(csv_file_path)
+
+    # Convert dates to Excel date format
+    sage_data_df['WentLiveOn'] = pd.to_datetime(sage_data_df['WentLiveOn'], format='%m/%d/%Y')
+    excel_date_start = datetime(1899, 12, 30)  # Excel's serial date start
+    sage_data_df['WentLiveOn'] = (sage_data_df['WentLiveOn'] - excel_date_start).dt.days
 
     # Merge the result_v5_df and sage_data_df on the 'Device Serial' and 'SerialNumber' columns
     merged_df = pd.merge(result_v5_df, sage_data_df[['SerialNumber', 'WentLiveOn']], how='left',
                          left_on='Device Serial', right_on='SerialNumber')
 
-    # Update the 'Sage Go-Live' column in result_v5_df
-    # REFACTORING NOTE: Dear self, when you see this you are going to try to consolidate and shrink it to:
-    # result_v5_df.loc[merged_df['WentLiveOn'].notnull(), 'Sage Go-Live'] = merged_df.loc[
-    #    merged_df['WentLiveOn'].notnull(), 'WentLiveOn']
-    # But that won't work. You'll get a TypeError that you'll spend hours trying to figure out.
-    # Using the isin() create a boolean mask that ignores all the NULL values and puts the real values into a list.
+    # Update the result_v5_df 'Sage Go-Live' column
     result_v5_df.loc[result_v5_df['Device Serial'].isin(
         merged_df.loc[merged_df['WentLiveOn'].notnull(), 'Device Serial']), 'Sage Go-Live'] = merged_df.loc[
         merged_df['WentLiveOn'].notnull(), 'WentLiveOn'].values.tolist()
 
-    # TODO: Fill in the "Device Age" column.
-    # TODO: Fill in the "Path Forward" column.
+    # Calculate the Device Age based on Device Go-Live and Sage Go-Live
+    result_v5_df['Device Age'] = None
+    device_go_live = pd.to_datetime(result_v5_df['Device Go-Live'], format='%m/%d/%Y', errors='coerce')
+    sage_go_live = pd.to_datetime(result_v5_df['Sage Go-Live'], format='%m/%d/%Y', errors='coerce')
+    max_go_live_dates = pd.concat([device_go_live, sage_go_live], axis=1).max(axis=1)
+    current_date = pd.Timestamp.now()
+    result_v5_df['Device Age'] = (current_date - max_go_live_dates).dt.days // 365
 
+    # ReadyTouch Report -- Add a new column "Path Forward" and fill it with relevant values.
+    result_rt_df['Resolution Path'] = ""
+    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 14.04", 'Resolution Path'] = "Upgrade (Ubuntu 14.04)"
+    result_rt_df.loc[result_rt_df['CPU Product'].isnull() | (
+            result_rt_df['CPU Product'] == ""), 'Resolution Path'] = "Investigate (Not in Dash)"
+    result_rt_df.loc[result_rt_df['CPU Product'].str.contains("^Opti", na=False), 'Resolution Path'] = \
+        "Replace (CPU Not Eligible)"
+    result_rt_df.loc[result_rt_df['OS Version'] == "Ubuntu 20.04", 'Resolution Path'] = "Up-to-Date (Ubuntu 20.04)"
+
+    # v5 Report -- Fill the "Resolution Path" column with relevant values
+    four_months_ago = pd.Timestamp.now() - pd.DateOffset(months=4)
+    result_v5_df['Resolution Path'] = "Investigate"
+    result_v5_df.loc[result_v5_df['OS Version'].notnull() &
+                     result_v5_df['OS Version'].str.startswith('Cent'), 'Resolution Path'] = "Upgrade (CentOS)"
+    result_v5_df.loc[result_v5_df['OS Version'] == "Ubuntu 14.04", 'Resolution Path'] = "Upgrade (Ubuntu 14)"
+    result_v5_df.loc[result_v5_df['Device Age'] >= 6, 'Resolution Path'] = "Replace (6+ years old)"
+    mask = (result_v5_df['OS Version'].str.startswith('Cent')) & \
+           (result_v5_df['CPU Product'].str.startswith('W10'))
+    result_v5_df.loc[mask, 'Resolution Path'] = "Replace (CentOS on W10* cpu)"
+    result_v5_df.loc[result_v5_df['Device Serial'].str.startswith('VSH310'), 'Resolution Path'] = "Replace (VSH310xxx)"
+    mask = (result_v5_df['Device Serial'].str.startswith(('VSH1', 'VSH2')))
+    result_v5_df.loc[mask, 'Resolution Path'] = "Replace (VSH1 / VSH2)"
+    mask = (result_v5_df['Device Serial'].str.startswith('VSH3')) & \
+           (result_v5_df['Location Name'].isin(['', 'Orphan Loc'])) & \
+           (result_v5_df['Device Last Sync'] < four_months_ago)
+    result_v5_df.loc[mask, 'Resolution Path'] = "Decommission (VSH3 unused orphan)"
+    mask = (result_v5_df['Device Serial'].str.startswith(('VSH1', 'VSH2'))) & \
+           (result_v5_df['Location Name'].isin(['', 'Orphan Loc']))
+    result_v5_df.loc[mask, 'Resolution Path'] = "Decommission (VSH1 / VSH2 orphan)"
+    result_v5_df.loc[result_v5_df['OS Version'] == "Ubuntu 20.04", 'Resolution Path'] = "Already Up-to-Date"
+
+    # Extra Cleanup
+    result_v5_df.loc[result_v5_df['Operation Name'] == "Canteen Canada", 'Operation Group'] = "Canteen Canada"
+    result_rt_df.loc[result_rt_df]
     # Save the result to an Excel file
     sheet1 = "v5 KioskAges"
     sheet2 = "RT KioskAges"
