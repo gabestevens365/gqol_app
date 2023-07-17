@@ -1,5 +1,6 @@
 from credentials.credentials_sosdb import host, port, username, password, database, \
-    legacy_server, legacy_database, legacy_pwd, legacy_uid
+    legacy_server, legacy_database, legacy_uid, legacy_pwd, \
+    av_server, av_database, av_uid, av_pwd
 import os
 import datetime
 from datetime import date, datetime
@@ -39,6 +40,23 @@ def connect_to_leg_database():
         return conn
     except pyodbc.Error as error:
         print(f"Failed to connect to the Legacy (MsSQL) database: {error}")
+        return None
+
+
+# Function to connect to the Legacy MsSQL database
+def connect_to_av_database():
+    try:
+        conn = pyodbc.connect(
+            'DRIVER={SQL Server Native Client 11.0};'
+            f'SERVER={av_server};'
+            f'DATABASE={av_database};'
+            f'UID={av_uid};'
+            f'PWD={av_pwd};'
+        )
+        print(f"Connected to the AirVend (MsSQL) database successfully!")
+        return conn
+    except pyodbc.Error as error:
+        print(f"Failed to connect to the AirVend (MsSQL) database: {error}")
         return None
 
 
@@ -124,13 +142,24 @@ def save_to_excel(dataframes, file_name, sheet_names):
                     worksheet.set_column('A:A', None, format_gray)
                     worksheet.conditional_format('A1:G1', {'type': 'no_blanks', 'format': format_red})
                     worksheet.set_column('H:H', None, format_gray)
+                    worksheet.conditional_format('H1:P1', {'type': 'no_blanks', 'format': format_orange})
+                    worksheet.set_column('Q:Q', None, format_gray)
+                    worksheet.conditional_format('Q1:AB1', {'type': 'no_blanks', 'format': format_yellow})
+                    worksheet.set_column('AC:AC', None, format_gray)
+                    worksheet.conditional_format('AC1:AK1', {'type': 'no_blanks', 'format': format_green})
+                    worksheet.set_column('AL:AL', None, format_gray)
+                    worksheet.conditional_format('AL1:AW1', {'type': 'no_blanks', 'format': format_blue})
+                elif sheet_name == 'All AirVend Devices':
+                    worksheet.set_column('A:A', None, format_gray)
+                    worksheet.conditional_format('A1:G1', {'type': 'no_blanks', 'format': format_red})
+                    worksheet.set_column('H:H', None, format_gray)
                     worksheet.conditional_format('H1:O1', {'type': 'no_blanks', 'format': format_orange})
                     worksheet.set_column('P:P', None, format_gray)
                     worksheet.conditional_format('P1:Z1', {'type': 'no_blanks', 'format': format_yellow})
                     worksheet.set_column('AA:AA', None, format_gray)
-                    worksheet.conditional_format('AA1:AI1', {'type': 'no_blanks', 'format': format_green})
-                    worksheet.set_column('AJ:AJ', None, format_gray)
-                    worksheet.conditional_format('AJ1:AR1', {'type': 'no_blanks', 'format': format_blue})
+                    worksheet.conditional_format('AA1:AJ1', {'type': 'no_blanks', 'format': format_green})
+                    worksheet.set_column('AK:AK', None, format_gray)
+                    worksheet.conditional_format('AK1:AQ1', {'type': 'no_blanks', 'format': format_blue})
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -196,7 +225,7 @@ def alldevices_report_365rm_builder():
     report_exists = find_latest_report(report_path, report_name, report_date)
     if report_exists is None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
-        alldevice_report_365rm_v5_writer(final_file_name)
+        alldevice_report_365rm_writer(final_file_name)
     else:
         print(f"{report_path}{report_exists} already exists!\n")
         choice = input("Do you want to generate a new copy? [Y/N]: ")
@@ -204,7 +233,7 @@ def alldevices_report_365rm_builder():
 
         if choice == "Y":
             print(f"Generating a new copy of {report_name} for {report_date}.")
-            alldevice_report_365rm_v5_writer(final_file_name)
+            alldevice_report_365rm_writer(final_file_name)
         elif choice == "N":
             main_menu()
         else:
@@ -251,11 +280,12 @@ def kiosk_age_report_builder():
             main_menu()
 
 
-# AllDevices Report - 365rm - v5 - Builder
-def alldevice_report_365rm_v5_writer(filename):
+# AllDevices Report - 365rm - Builder
+def alldevice_report_365rm_writer(filename):
     # MySQL query
-    query_file_v5 = "./queries/v5_All_Device_Report.sql"
-    query_file_leg = "./queries/Legacy_All-Devices.sql"
+    query_file_v5 = "./queries/All-Devices_v5.sql"
+    query_file_leg = "./queries/All-Devices_Legacy.sql"
+#    query_file_av = "./queries/All-Devices_AV.sql"
 
     # Connect to the v5 database
     connection_v5 = connect_to_v5_database()
@@ -266,6 +296,11 @@ def alldevice_report_365rm_v5_writer(filename):
     connection_leg = connect_to_leg_database()
     if connection_leg is None:
         return
+
+    # Connect to the AV database
+#    connection_av = connect_to_av_database()
+#    if connection_av is None:
+#        return
 
     # Execute the v5 query
     result_v5_df = execute_query(connection_v5, query_file_v5)
@@ -279,9 +314,16 @@ def alldevice_report_365rm_v5_writer(filename):
         connection_leg.close()
         return
 
+    # Execute the AV query
+#    result_av_df = execute_query(connection_av, query_file_av)
+#    if result_av_df is None:
+#        connection_av.close()
+#        return
+
     # Save the result to an Excel file
     sheet1 = "All ADM-v5 Devices"
     sheet2 = "All Legacy Devices"
+#    sheet3 = "All AirVend Devices"
     save_to_excel([result_v5_df, result_leg_df], filename, [sheet1, sheet2])
 
 
