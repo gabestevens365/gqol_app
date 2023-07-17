@@ -1,41 +1,43 @@
+-- The ADM/v5 All-Devices Report
+-- Run in RDS or a Reader (will not work in Snowflake)
+-- Version 2. Worked on 2023.07.15
 SELECT
--- This is the All-Devices Detail Query for v5. This will not run in Snowflake. Use reader.365rm.us
-	-- Information: Top Level --
-	'365 Retail Markets'					AS	"Platform Parent"
-	,'v5'													AS  "Platform"
-	,''														AS	"LOB"
-	,o.SAGENUMBER1								AS	"Sage ID"
-	,''														AS	"Org Accounting ID"
-	,s.VALUE											AS	"Customer Group"
-	,''														AS	"1"
-	-- Information: Location --
-	,l.ID													AS	"Location ID"
-	,l.NAME												AS  "Location Name"
-	,''														AS	"Location Brand"
-	,l.ADDRESS										AS	"Location Address"
-	,l.CITY												AS	"Location City"
-	,l.STATE											AS	"Location State"
-	,l.ZIP												AS	"Location Zip"
-	,l.COUNTRY										AS  "Location Country"
-	,o.CURRENCY										AS  "Location Currency"
-	,c.NAME												AS  "Location Campus/MSL Name"
-	,''														AS	"Location GMA"
-	,l.ACTIVATIONDATE							AS	"Location Go-Live"
-	,''														AS	"2"
+	''                                          AS	"Quick Ref"
+	,'365 Retail Markets'                       AS	"Platform Parent"
+	,'ADM/v5'                                   AS	"Platform"
+	,COALESCE(sfe.OpGroup, "NONE")              AS	"Operator Group"
+	,sfediv.value                               AS	"Operator Division"
+	,COALESCE(o.Name, "Orphan Operation")		AS	"Operator Name"
+	,COALESCE(l.Name, "Orphan Location")		AS	"Location Name"
+	,k.Name                                     AS	"Serial Number"
 	-- Information: Operation --
-	,s.VALUE											AS  "Operation Group"
-	,o.SAGENUMBER1								AS  "Operation Sage ID"
-	,o.ID													AS	"Operation ID"
-	,''														AS	"Operation Accounting ID"
-	,o.NAME												AS  "Operation Name"
-	,o.ADDRESS										AS	"Operation Address"
-	,o.CITY												AS	"Operation City"
-	,o.STATE											AS	"Operation State"
-	,o.ZIP												AS	"Operation Zip"
-	,o.COUNTRY										AS	"Operation Country"
-	,''														AS	"3"
+	,''                                         AS	"Op Info"
+	,o.ID                                       AS	"Op ID"
+	,COALESCE(o.Name, "Orphan Operation")		AS	"Op Name"
+	,o.SageNumber1                              AS	"Op Sage ID"
+	,o.ADDRESS                                  AS	"Op Address"
+	,o.CITY                                     AS	"Op City"
+	,o.STATE                                    AS	"Op State"
+	,o.ZIP                                      AS	"Op Zip"
+	,o.COUNTRY                                  AS	"Op Country"
+	,o.CURRENCY                                 AS  "Op Currency"
+	-- Information: Location --
+	,''                                         AS	"Loc Info"
+	,COALESCE(c.Name, "No Campus")              AS  "Loc Campus/MSL Name"
+	,l.ID                                       AS	"Loc ID"
+	,COALESCE(l.Name, "Orphan Location")		AS	"Loc Name"
+	,l.Address                                  AS	"Loc Address"
+	,l.City                                     AS	"Loc City"
+	,l.State                                    AS	"Loc State"
+	,l.Zip                                      AS	"Loc Zip"
+	,l.Country                                  AS  "Loc Country"
+	,l.DateCreated                              AS	"Loc Go-Live"
+	,l.SIC                                      AS	"Loc Standard Industry Classification"
 	-- Information: Device --
-	,k.NAME												AS  "Device Serial"
+	,''                                         AS  "Device Info"
+	,k.ID                                       AS	"Device ID"
+	,k.Name                                     AS  "Device Serial"
+	,k.Type                                     AS	"Device Type"
   ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
@@ -49,97 +51,115 @@ SELECT
 		WHEN 'BEACON'           THEN 'Beacon'
 		WHEN 'MM6'              THEN 'MM6'
 		WHEN 'SODASTREAM'       THEN 'SodaStream'
-  END                        		AS "Model"
-	,CARDREADER										AS	"Device CC Reader"
-	,cp.NAME											AS	"Device CC Processor"
-	,h.OTIFIRMWARE								AS	"Device CC Firmware"
-	,h.OTICONFIG									AS	"Device CC Config"
-	,fp.VALUE											AS	"Device FP Reader"
-	,k.DeployDate									AS  "Device Go-Live"
-	,k.STATUS											AS	"Device Status"
-	,k.LastFullSync								AS	"Device Last Sync"
-	,ks.LASTSALE									AS	"Device Last Sale"
-	,''														AS	"4"
+		ELSE k.HWTYPE
+  END                                           AS	"Device Model"
+	,cp.NAME                                    AS	"Device CC Processor"
+	,t.CardReader                               AS	"Device CC Reader"
+	,fp.VALUE                                   AS	"Device FP Reader"
+	,k.DeployDate                               AS  "Device Go-Live"
+	,k.LastFullSync                             AS	"Device Last Sync"
+	,ks.LASTSALE                                AS	"Device Last Sale"
+	,k.STATUS                                   AS	"Device Status"
 	-- Information: OS & Apps --
-	,REPLACE(h.OS,'"','')					AS  "App OS Ver"
-	,''														AS	"App POS"
-	,k.KSKVERSION									AS	"App POS Ver"
-	,''														AS	"App Anti-Malware"
-	,''														AS	"App Anti-Malware Version"
-	,''														AS	"App Anti-Malware Definition Date"
-	,COALESCE(ol.VALUE,og.VALUE)	AS  "App Policies"
-	,''														AS	"App Biometric Policy Version"
-	,''														AS	"App Privacy Policy"
-	,''														AS	"App Privacy Policy Version"
-	,''														AS	"App TermsOfService"
-	,''														AS	"App TermsOfService Version"
+	,''                                         AS	"App Info"
+	,CONCAT(SUBSTRING_INDEX(k.OSVERSION, '.', 2))	AS "OS Version"
+	,k.KSKVERSION                               AS	"App POS Ver"
+	,h.OTIFIRMWARE                              AS	"App OTI Firmware"
+	,h.OTICONFIG                                AS	"App OTI Config"
+	,''                                         AS	"App Anti-Malware"
+	,''                                         AS	"App Anti-Malware Version"
+	,''                                         AS	"App Anti-Malware Definition Date"
+	,COALESCE(ol.VALUE,og.VALUE)                AS  "App Policies"
 
-FROM org o
-	INNER JOIN location l ON o.ID = l.ORG
-	INNER JOIN kiosk k ON l.ID = k.LOCATION
-	LEFT JOIN CLIENT c ON c.ID = l.CLIENT
-	LEFT JOIN sosdb.lookupstr cp	ON k.PROCESSOR1 = cp.KEYSTR AND CP.TYPE = 'CCPROCESSOR'
+FROM Kiosk k
+	LEFT JOIN org o				ON k.org = o.id
+	LEFT JOIN location l	ON k.location = l.id
+	LEFT JOIN CLIENT c		ON l.CLIENT = c.id
+	
+	-- Get the Operator Group info from SFECFG
 	LEFT JOIN (
-		SELECT ID, NAME, VALUE
+		SELECT NAME, VALUE AS OpGroup
 		FROM sfecfg
-		WHERE UPPER(TYPE) = 'SPECIALTYPE' AND UPPER(CFGTYPE) ='ORG'
-	) s ON o.ID = s.NAME
+		WHERE TYPE = 'SPECIALTYPE' AND CFGTYPE ='ORG'
+	) sfe ON o.ID = sfe.NAME
 
+	-- Get the Canteen Division info from SFECFG
+	LEFT JOIN (
+		SELECT NAME, VALUE
+		FROM sfecfg
+		WHERE TYPE = 'CANTEENDIVISION'
+	) sfediv ON o.id = sfediv.NAME
+
+	-- Get the Pico Device Types from SFECFG (adds about 2 seconds to the query of ~60k devices)
 	LEFT JOIN ( SELECT picodevicetype.Value AS picovalue, picodevicetype.name AS p_name
 		FROM sosdb.kiosk
-			JOIN location ON kiosk.location = location.id
-			INNER JOIN sosdb.sfecfg picodevicetype ON kiosk.id = picodevicetype.name
-			JOIN org ON kiosk.org = org.id
-		WHERE kiosk.HWType = 'PICO'
-			AND picodevicetype.Type = 'PICODEVICETYPE'
+            JOIN location ON kiosk.location = location.id
+            INNER JOIN sosdb.sfecfg picodevicetype ON kiosk.id = picodevicetype.name
+            JOIN org ON kiosk.org = org.id
+		WHERE kiosk.HWType = 'PICO' AND picodevicetype.Type = 'PICODEVICETYPE'
 	) p ON p.p_name=k.id
 
+	-- Get the CardReader types from SFECFG (adds about 1 second to the query of ~60k devices)
 	LEFT JOIN (
-		SELECT ID, NAME,
-		CASE UPPER(VALUE)
-			WHEN 'C' THEN 'Castles'
-			WHEN 'I' THEN 'IdTech'
-			WHEN 'L' THEN 'LineaPro'
-			WHEN 'M' THEN 'Magtec'
-			WHEN 'N' THEN 'Nayax'
-			WHEN 'O' THEN '365 Secure'
-			WHEN 'V' THEN 'Verifone'
-		END  CARDREADER
+		SELECT
+			ID, NAME,
+			CASE VALUE
+				WHEN 'C' THEN 'Castles'
+				WHEN 'I' THEN 'IdTech'
+				WHEN 'L' THEN 'LineaPro'
+				WHEN 'M' THEN 'Magtec'
+				WHEN 'N' THEN 'Nayax'
+				WHEN 'O' THEN '365 Secure'
+				WHEN 'V' THEN 'Verifone'
+				ELSE VALUE
+			END  CardReader
 		FROM sfecfg
-		WHERE UPPER(TYPE) = 'ENCRYPTMSR' AND UPPER(CFGTYPE) = 'KSK'
+		WHERE TYPE = 'ENCRYPTMSR' AND CFGTYPE = 'KSK'
 	) t ON k.ID = t.NAME
 
+    -- Get the Last Transaction Date (adds about 2 seconds to the query of ~60k devices)
+    LEFT JOIN (
+			SELECT
+				KS.ORG,
+				KS.LOCATION,
+				KS.KIOSK,
+				MAX(KS.LASTTRANSDATE) AS LASTSALE
+			FROM SOSDB.KIOSKSTATUS KS
+			INNER JOIN (
+				SELECT k.ORG, k.LOCATION, k.ID AS KIOSK
+				FROM sosdb.org o
+				INNER JOIN sosdb.location l ON o.ID = l.ORG
+				INNER JOIN sosdb.kiosk k ON l.ID = k.LOCATION
+		) AS kiosk_info ON KS.ORG = kiosk_info.ORG AND KS.LOCATION = kiosk_info.LOCATION AND KS.KIOSK = kiosk_info.KIOSK
+			GROUP BY KS.ORG, KS.LOCATION, KS.KIOSK
+    ) KS ON o.ID = KS.ORG AND l.ID = KS.LOCATION AND k.ID = KS.KIOSK
+
+	-- Fingerprint Reader Presence (Adds about 1 second to the query of ~60k devices)
+	LEFT JOIN (
+    SELECT NAME, VALUE
+    FROM sfecfg
+    WHERE TYPE = 'HASFP'
+	) fp ON k.id = fp.NAME
+	
 	-- Get the Policy Values
-		LEFT JOIN (
+	LEFT JOIN (
 		SELECT ID, NAME, CONCAT('Org - ',VALUE) AS VALUE
 		FROM sfecfg
-		WHERE UPPER(TYPE) = 'GDPRTYPE' AND UPPER(CFGTYPE) = 'ORG'
+		WHERE TYPE = 'GDPRTYPE' AND CFGTYPE = 'ORG'
 	) og ON o.ID = og.NAME
 	LEFT JOIN (
 		SELECT ID, NAME, CONCAT('Location - ',VALUE) AS VALUE
 		FROM sfecfg
-		WHERE UPPER(TYPE) = 'GDPRTYPE' AND UPPER(CFGTYPE) = 'LOC'
+		WHERE TYPE = 'GDPRTYPE' AND CFGTYPE = 'LOC'
 	) ol ON l.ID = ol.NAME
 
-	-- Try getting from kioskstatus instead of salesheader
-	LEFT JOIN (
-		SELECT kiosk, MAX(lasttransdate) AS LASTSALE
-		FROM kioskstatus
-		GROUP BY kiosk
-	) ks ON ks.kiosk = k.id
+	-- Needs Optimization
+	-- Get the Card Processor (Adds about 18 seconds to the query of ~60k)
+	LEFT JOIN sosdb.lookupstr cp	ON k.PROCESSOR1 = cp.KEYSTR AND CP.TYPE = 'CCPROCESSOR'
 
-	-- Get Fingerprint Reader Enable-Setting
-	LEFT JOIN(
-		SELECT NAME, TYPE, VALUE
-		FROM sfecfg
-		WHERE TYPE = 'HASFP'
-	) fp ON k.id = fp.NAME
-
-
-	-- My DashDB Left Join -- This block is what forces the query into reader.365rm.us instead of snowflake.
+	-- Get the CC Firmware & Config from DashDB (adds about 58 seconds to the query of about ~60k devices)
 	LEFT JOIN (
 		SELECT h.KIOSKNAME
-			,REPLACE(JSON_EXTRACT(h.BASICINFO, '$.os'),CHAR(34),"""")							AS OS
 			,h.KIOSKINFO
 			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.otifirmware'),CHAR(34), "")		AS OTIFIRMWARE
 			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.oticonfig'),CHAR(34), "")			AS OTICONFIG
@@ -149,8 +169,9 @@ FROM org o
 				FROM dashdb.hostinfo
 				GROUP BY KIOSKNAME
 			) AS u ON h.KIOSKNAME = u.KIOSKNAME AND h.LASTUPDATED = u.LASTUPDATED
-		WHERE JSON_VALID(h.kioskinfo) = 1 AND h.KIOSKINFO IS NOT NULL AND JSON_VALID(h.basicinfo) = 1
-		GROUP BY h.KIOSKNAME, REPLACE(JSON_EXTRACT(h.BASICINFO, '$.os'),CHAR(34),"""")
+		WHERE JSON_VALID(h.kioskinfo) = 1 AND h.KIOSKINFO IS NOT NULL
+		GROUP BY h.KIOSKNAME, h.kioskinfo
 	) AS h ON k.NAME = h.KIOSKNAME
 
-ORDER BY o.NAME, c.NAME, l.NAME, k.HWTYPE, k.NAME
+
+ORDER BY sfe.OpGroup, sfediv.Value, o.Name, l.Name, k.type

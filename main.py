@@ -1,13 +1,15 @@
-from credentials.credentials_sosdb import host, port, username, password, database
+from credentials.credentials_sosdb import host, port, username, password, database, \
+    legacy_server, legacy_database, legacy_pwd, legacy_uid
 import os
 import datetime
 from datetime import date, datetime
 import mysql.connector
+import pyodbc
 import pandas as pd
 
 
-# Function to connect to the MySQL database
-def connect_to_database():
+# Function to connect to the ADM/v5 MySQL database
+def connect_to_v5_database():
     try:
         mysql.connector.raise_on_warnings = True
         conn = mysql.connector.connect(
@@ -16,10 +18,27 @@ def connect_to_database():
             user=username,
             password=password,
             database=database)
-        print(f"Connected to the database successfully!")
+        print(f"Connected to the ADM/v5 (MySQL) database successfully!")
         return conn
     except mysql.connector.Error as error:
-        print(f"Failed to connect to the database: {error}")
+        print(f"Failed to connect to the ADM/v5 (MySQL) database: {error}")
+        return None
+
+
+# Function to connect to the Legacy MsSQL database
+def connect_to_leg_database():
+    try:
+        conn = pyodbc.connect(
+            'DRIVER={SQL Server Native Client 11.0};'
+            f'SERVER={legacy_server};'
+            f'DATABASE={legacy_database};'
+            f'UID={legacy_uid};'
+            f'PWD={legacy_pwd};'
+        )
+        print(f"Connected to the Legacy (MsSQL) database successfully!")
+        return conn
+    except pyodbc.Error as error:
+        print(f"Failed to connect to the Legacy (MsSQL) database: {error}")
         return None
 
 
@@ -69,7 +88,11 @@ def save_to_excel(dataframes, file_name, sheet_names):
             for df, sheet_name in zip(dataframes, sheet_names):
                 # Write to DataFrames to Excel
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
+                workbook = writer.book
                 worksheet = writer.sheets[sheet_name]
+
+                # Freeze the top rows
+                worksheet.freeze_panes(1, 0)
 
                 # Auto-Width for each column, with a max of 60.
                 for i, col in enumerate(df.columns):
@@ -77,6 +100,37 @@ def save_to_excel(dataframes, file_name, sheet_names):
                     if column_width > 59:
                         column_width = 59
                     worksheet.set_column(i, i, column_width + 1)
+
+                # Format specific sheets
+                format_red = workbook.add_format({'bg_color': '#FFB6C1'})
+                format_orange = workbook.add_format({'bg_color': '#FFE4B5'})
+                format_yellow = workbook.add_format({'bg_color': '#FFFFE0'})
+                format_green = workbook.add_format({'bg_color': '#BDFCC9'})
+                format_blue = workbook.add_format({'bg_color': '#BFEFFF'})
+#                format_purple = workbook.add_format({'bg_color': '#E6E6FA'})
+                format_gray = workbook.add_format({'pattern': 18, 'bg_color': '#CCCCCC'})
+                if sheet_name == 'All ADM-v5 Devices':
+                    worksheet.set_column('A:A', None, format_gray)
+                    worksheet.conditional_format('A1:H1', {'type': 'no_blanks', 'format': format_red})
+                    worksheet.set_column('I:I', None, format_gray)
+                    worksheet.conditional_format('I1:R1', {'type': 'no_blanks', 'format': format_orange})
+                    worksheet.set_column('S:S', None, format_gray)
+                    worksheet.conditional_format('S1:AC1', {'type': 'no_blanks', 'format': format_yellow})
+                    worksheet.set_column('AD:AD', None, format_gray)
+                    worksheet.conditional_format('AD1:AO1', {'type': 'no_blanks', 'format': format_green})
+                    worksheet.set_column('AP:AP', None, format_gray)
+                    worksheet.conditional_format('AP1:AX1', {'type': 'no_blanks', 'format': format_blue})
+                elif sheet_name == 'All Legacy Devices':
+                    worksheet.set_column('A:A', None, format_gray)
+                    worksheet.conditional_format('A1:G1', {'type': 'no_blanks', 'format': format_red})
+                    worksheet.set_column('H:H', None, format_gray)
+                    worksheet.conditional_format('H1:O1', {'type': 'no_blanks', 'format': format_orange})
+                    worksheet.set_column('P:P', None, format_gray)
+                    worksheet.conditional_format('P1:Z1', {'type': 'no_blanks', 'format': format_yellow})
+                    worksheet.set_column('AA:AA', None, format_gray)
+                    worksheet.conditional_format('AA1:AI1', {'type': 'no_blanks', 'format': format_green})
+                    worksheet.set_column('AJ:AJ', None, format_gray)
+                    worksheet.conditional_format('AJ1:AR1', {'type': 'no_blanks', 'format': format_blue})
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -182,7 +236,7 @@ def alldevices_report_365rm_builder():
     formatted_time = current_time.strftime("%H%M")
 
     report_path = "./reports/AllDevices/"
-    report_name = "ADM_All_Devices_Report"
+    report_name = "All_Devices_Report"
     report_date = formatted_date
     report_time = formatted_time
     report_ext = ".xlsx"
@@ -192,7 +246,7 @@ def alldevices_report_365rm_builder():
 
     # Check to see whether the file already exists, first.
     report_exists = find_latest_report(report_path, report_name, report_date)
-    if report_exists == None:
+    if report_exists is None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
         alldevice_report_365rm_v5_writer(final_file_name)
     else:
@@ -231,7 +285,7 @@ def kiosk_age_report_builder():
 
     # Check to see whether the file already exists, first.
     report_exists = find_latest_report(report_path, report_name, report_date)
-    if report_exists == None:
+    if report_exists is None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
         kiosk_age_report_writer(final_file_name)
     else:
@@ -252,22 +306,35 @@ def kiosk_age_report_builder():
 # AllDevices Report - 365rm - v5 - Builder
 def alldevice_report_365rm_v5_writer(filename):
     # MySQL query
-    query_file = "./queries/v5_All_Device_Report.sql"
+    query_file_v5 = "./queries/v5_All_Device_Report.sql"
+    query_file_leg = "./queries/Legacy_All-Devices.sql"
 
-    # Connect to the database
-    connection = connect_to_database()
-    if connection is None:
+    # Connect to the v5 database
+    connection_v5 = connect_to_v5_database()
+    if connection_v5 is None:
         return
 
-    # Execute the query
-    result_df = execute_query(connection, query_file)
-    if result_df is None:
-        connection.close()
+    # Connect to the Legacy database
+    connection_leg = connect_to_leg_database()
+    if connection_leg is None:
+        return
+
+    # Execute the v5 query
+    result_v5_df = execute_query(connection_v5, query_file_v5)
+    if result_v5_df is None:
+        connection_v5.close()
+        return
+
+    # Execute the Legacy query
+    result_leg_df = execute_query(connection_leg, query_file_leg)
+    if result_leg_df is None:
+        connection_leg.close()
         return
 
     # Save the result to an Excel file
-    sheetname = "All ADM-v5 Devices"
-    save_to_excel([result_df], filename, [sheetname])
+    sheet1 = "All ADM-v5 Devices"
+    sheet2 = "All Legacy Devices"
+    save_to_excel([result_v5_df, result_leg_df], filename, [sheet1, sheet2])
 
 
 # KioskAge Report - 365rm - Writer
@@ -277,20 +344,20 @@ def kiosk_age_report_writer(filename):
     query_file_rt = "./queries/KioskAge_RT_Report.sql"
 
     # Connect to the database
-    connection = connect_to_database()
-    if connection is None:
+    connection_v5 = connect_to_v5_database()
+    if connection_v5 is None:
         return
 
     # Execute the v5 query
-    result_v5_df = execute_query(connection, query_file_v5)
+    result_v5_df = execute_query(connection_v5, query_file_v5)
     if result_v5_df is None:
-        connection.close()
+        connection_v5.close()
         return
 
     # Execute the ReadyTouch query
-    result_rt_df = execute_query(connection, query_file_rt)
+    result_rt_df = execute_query(connection_v5, query_file_rt)
     if result_rt_df is None:
-        connection.close()
+        connection_v5.close()
         return
 
     # Exclude specific CPU Products from the dataframe
@@ -378,7 +445,7 @@ def kiosk_age_report_writer(filename):
 
     # Extra Cleanup
     result_v5_df.loc[result_v5_df['Operation Name'] == "Canteen Canada", 'Operation Group'] = "Canteen Canada"
-    result_rt_df.loc[result_rt_df]
+#    result_rt_df.loc[result_rt_df]
     # Save the result to an Excel file
     sheet1 = "v5 KioskAges"
     sheet2 = "RT KioskAges"
