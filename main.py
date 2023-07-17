@@ -157,74 +157,22 @@ def find_latest_report(report_path, report_name, report_date):
 # Main menu function
 def main_menu():
     print("=== Main Menu ===")
-    print("1. ADM / v5 Reports")
+    print("1. All Devices Report")
+    print("2. Kiosk Age Report")
     print("0. Quit")
 
     choice = input("Enter your choice: ")
 
     if choice == '1':
-        adm_v5_reports_menu()
+        alldevices_report_365rm_builder()
+    if choice == '2':
+        kiosk_age_report_builder()
     elif choice == '0':
         print("Exiting the program. Goodbye!")
         return
     else:
         print("Invalid choice. Please try again.")
         main_menu()
-
-
-# ADM / v5 Reports sub-menu
-def adm_v5_reports_menu():
-    print("=== ADM / v5 Reports ===")
-    print("1. All Devices Reports")
-    print("2. OS Upgrade Reports")
-    print("0. Return to Main Menu")
-
-    choice = input("Enter your choice: ")
-
-    if choice == '1':
-        adm_all_devices_reports_menu()
-    elif choice == '2':
-        adm_os_upgrade_reports_menu()
-    elif choice == '0':
-        main_menu()
-    else:
-        print("Invalid choice. Please try again.")
-        adm_v5_reports_menu()
-
-
-# All Devices Reports Menu
-def adm_all_devices_reports_menu():
-    print("=== All Devices Reports ===")
-    print("1. All-Devices Report - 365RM (This one is everything in ADM)")
-    print("0. Return to Main Menu")
-
-    choice = input("Enter your choice: ")
-
-    if choice == "1":
-        alldevices_report_365rm_builder()
-    elif choice == "0":
-        main_menu()
-    else:
-        print("Invalid Choice. Please try again.")
-        adm_all_devices_reports_menu()
-
-
-# ADM OS Upgrade Reports Menu
-def adm_os_upgrade_reports_menu():
-    # TODO: Implement the adm_os_upgrade_reports submenu
-    print("=== ADM OS Upgrade Reports ===")
-    print("1. Kiosk-Age Report")
-    print("0. Return to Main Menu")
-
-    choice = input("Enter your choice: ")
-
-    if choice == "1":
-        kiosk_age_report_builder()
-    elif choice == "0":
-        main_menu()
-    else:
-        print("Invalid Choice. Please try again.")
-        adm_all_devices_reports_menu()
 
 
 # The All-Devices Reports
@@ -261,7 +209,7 @@ def alldevices_report_365rm_builder():
             main_menu()
         else:
             print("Invalid Choice.")
-            adm_all_devices_reports_menu()
+            main_menu()
 
 
 # KioskAge Report - All 365
@@ -300,7 +248,7 @@ def kiosk_age_report_builder():
             main_menu()
         else:
             print("Invalid Choice.")
-            adm_os_upgrade_reports_menu()
+            main_menu()
 
 
 # AllDevices Report - 365rm - v5 - Builder
