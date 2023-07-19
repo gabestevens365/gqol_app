@@ -1,13 +1,13 @@
 -- This is the v5 Kiosk-Age and OS Version Report. This will not run in Snowflake. Use reader.365rm.us
 -- This worked on 2023.06.28 - GS
 SELECT
-    s.VALUE                         AS  "Operation Group"
+    COALESCE(s.VALUE, 'NONE')       AS  "Operation Group"
     ,sfe_division.value             AS	"Division"
     ,''                             AS	"Champion"
     ,o.SAGENUMBER1                  AS	"Sage ID"
     ,o.COUNTRY                      AS  "Country"
-    ,o.NAME                         AS  "Operation Name"
-    ,l.NAME                         AS  "Location Name"
+    ,COALESCE(o.NAME, 'Orphan Op')  AS  "Operation Name"
+    ,COALESCE(l.NAME, 'Orphan Loc') AS  "Location Name"
     ,k.NAME                         AS  "Device Serial"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
@@ -30,10 +30,10 @@ SELECT
     ,CONCAT(SUBSTRING_INDEX(k.OSVERSION, '.', 2)) AS "OS Version"
     ,h.product                      AS	"CPU Product"
 
-FROM org o
-	INNER JOIN location l ON o.ID = l.ORG
-	INNER JOIN kiosk k ON l.ID = k.LOCATION
-	LEFT JOIN CLIENT c ON c.ID = l.CLIENT
+FROM Kiosk k
+	LEFT JOIN org o			ON k.org = o.id
+	LEFT JOIN location l	ON k.location = l.id
+	LEFT JOIN CLIENT c		ON l.CLIENT = c.id
 
 	-- Get the Operator Groups
 	LEFT JOIN (

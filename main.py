@@ -1,6 +1,3 @@
-from credentials.credentials_sosdb import host, port, username, password, database, \
-    legacy_server, legacy_database, legacy_uid, legacy_pwd, \
-    av_server, av_database, av_uid, av_pwd
 import os
 import datetime
 from datetime import date, datetime
@@ -11,14 +8,15 @@ import pandas as pd
 
 # Function to connect to the ADM/v5 MySQL database
 def connect_to_v5_database():
+    from credentials.credentials_sosdb import adm_host, adm_port, adm_username, adm_password, adm_database
     try:
         mysql.connector.raise_on_warnings = True
         conn = mysql.connector.connect(
-            host=host,
-            port=port,
-            user=username,
-            password=password,
-            database=database)
+            host=adm_host,
+            port=adm_port,
+            user=adm_username,
+            password=adm_password,
+            database=adm_database)
         print(f"Connected to the ADM/v5 (MySQL) database successfully!")
         return conn
     except mysql.connector.Error as error:
@@ -28,6 +26,7 @@ def connect_to_v5_database():
 
 # Function to connect to the Legacy MsSQL database
 def connect_to_leg_database():
+    from credentials.credentials_sosdb import legacy_server, legacy_database, legacy_uid, legacy_pwd
     try:
         conn = pyodbc.connect(
             'DRIVER={SQL Server Native Client 11.0};'
@@ -45,6 +44,7 @@ def connect_to_leg_database():
 
 # Function to connect to the Legacy MsSQL database
 def connect_to_av_database():
+    from credentials.credentials_sosdb import av_server, av_database, av_uid, av_pwd
     try:
         conn = pyodbc.connect(
             'DRIVER={SQL Server Native Client 11.0};'
@@ -57,6 +57,36 @@ def connect_to_av_database():
         return conn
     except pyodbc.Error as error:
         print(f"Failed to connect to the AirVend (MsSQL) database: {error}")
+        return None
+
+
+# Function to connect to the CompanyKitchen MySQL database
+def connect_to_ck_database():
+    from credentials.credentials_sosdb import ck_host, ck_port, ck_username, ck_password, ck_database, \
+        ck_ssh_host, ck_ssh_port, ck_ssh_username, ck_ssh_password
+    import paramiko
+    try:
+        # SSH tunnel setup
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(ck_ssh_host, port=ck_ssh_port, username=ck_ssh_username, password=ck_ssh_password)
+
+
+        # Open SSH tunnel
+        ssh_tunnel = ssh_client.get_transport().open_channel('direct-tcpip', dest_addr=(ck_host, ck_port),
+                                                             src_addr=('', 0))
+        mysql.connector.raise_on_warnings = True
+        conn = mysql.connector.connect(
+            host=ck_host,
+            port=ck_port,
+            user=ck_username,
+            password=ck_password,
+            database=ck_database,
+            unix_socket=ssh_tunnel)
+        print(f"Connected to the CompanyKitchen (MySQL) database successfully!")
+        return conn
+    except mysql.connector.Error as error:
+        print(f"Failed to connect to the CompanyKitchen (MySQL) database: {error}")
         return None
 
 
@@ -73,6 +103,7 @@ def execute_query(conn, query_file):
         cursor.execute(query)
         results = cursor.fetchall()
         columns = [column[0] for column in cursor.description]
+        cursor.close()
 
         # Convert bytes columns to utf-8 strings
         decoded_results = []
@@ -193,9 +224,9 @@ def main_menu():
     choice = input("Enter your choice: ")
 
     if choice == '1':
-        alldevices_report_365rm_builder()
-    if choice == '2':
-        kiosk_age_report_builder()
+        report_builder("./reports/AllDevices/", "All_Devices_Report")
+    elif choice == '2':
+        report_builder("./reports/KioskAge/", "KioskAge_Report")
     elif choice == '0':
         print("Exiting the program. Goodbye!")
         return
@@ -204,16 +235,14 @@ def main_menu():
         main_menu()
 
 
-# The All-Devices Reports
-def alldevices_report_365rm_builder():
+# The Report Builder
+def report_builder(report_path, report_name):
     today = date.today()
     formatted_date = today.strftime("%Y-%m-%d")
 
     current_time = datetime.now()
     formatted_time = current_time.strftime("%H%M")
 
-    report_path = "./reports/AllDevices/"
-    report_name = "All_Devices_Report"
     report_date = formatted_date
     report_time = formatted_time
     report_ext = ".xlsx"
@@ -241,78 +270,40 @@ def alldevices_report_365rm_builder():
             main_menu()
 
 
-# KioskAge Report - All 365
-def kiosk_age_report_builder():
-    # Let's get some date and time variables.
-    today = date.today()
-    current_time = datetime.now()
-    formatted_date = today.strftime("%Y-%m-%d")
-    formatted_time = current_time.strftime("%H%M")
-
-    # Let's get some report metadata variables.
-    report_path = "./reports/KioskAge/"
-    report_name = "KioskAge_Report"
-    report_date = formatted_date
-    report_time = formatted_time
-    report_ext = ".xlsx"
-    final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
-
-    # Announce the report we're starting to generate.
-    print(f"{report_name} for {report_date} at {formatted_time}...")
-
-    # Check to see whether the file already exists, first.
-    report_exists = find_latest_report(report_path, report_name, report_date)
-    if report_exists is None:
-        print(f"Generating the first copy of {report_name} for {report_date}.")
-        kiosk_age_report_writer(final_file_name)
-    else:
-        print(f"{report_path}{report_exists} already exists!\n")
-        choice = input("Do you want to generate a new copy? [Y/N]: ")
-        choice = choice.upper()
-
-        if choice == "Y":
-            print(f"Generating a new copy of {report_name} for {report_date}.")
-            kiosk_age_report_writer(final_file_name)
-        elif choice == "N":
-            main_menu()
-        else:
-            print("Invalid Choice.")
-            main_menu()
-
-
-# AllDevices Report - 365rm - Builder
+# AllDevices Report
 def alldevice_report_365rm_writer(filename):
     # MySQL query
     query_file_v5 = "./queries/All-Devices_v5.sql"
     query_file_leg = "./queries/All-Devices_Legacy.sql"
 #    query_file_av = "./queries/All-Devices_AV.sql"
+    query_file_ck = "./queries/All-Devices_CK.sql"
 
     # Connect to the v5 database
-    connection_v5 = connect_to_v5_database()
-    if connection_v5 is None:
-        return
+#    connection_v5 = connect_to_v5_database()
+#    if connection_v5 is None:
+#        return
+
+    # Execute the v5 query
+#    result_v5_df = execute_query(connection_v5, query_file_v5)
+#    if result_v5_df is None:
+#        connection_v5.close()
+#        return
 
     # Connect to the Legacy database
-    connection_leg = connect_to_leg_database()
-    if connection_leg is None:
-        return
+#    connection_leg = connect_to_leg_database()
+#    if connection_leg is None:
+#        return
+
+    # Execute the Legacy query
+#    result_leg_df = execute_query(connection_leg, query_file_leg)
+#    if result_leg_df is None:
+#        connection_leg.close()
+#        return
 
     # Connect to the AV database
 #    connection_av = connect_to_av_database()
 #    if connection_av is None:
 #        return
-
-    # Execute the v5 query
-    result_v5_df = execute_query(connection_v5, query_file_v5)
-    if result_v5_df is None:
-        connection_v5.close()
-        return
-
-    # Execute the Legacy query
-    result_leg_df = execute_query(connection_leg, query_file_leg)
-    if result_leg_df is None:
-        connection_leg.close()
-        return
 
     # Execute the AV query
 #    result_av_df = execute_query(connection_av, query_file_av)
@@ -320,20 +311,33 @@ def alldevice_report_365rm_writer(filename):
 #        connection_av.close()
 #        return
 
+    # Connect to the CompanyKitchen database
+    connection_ck = connect_to_ck_database()
+    if connection_ck is None:
+        return
+
+    # Execute the CompanyKitchen query
+    result_ck_df = execute_query(connection_ck, query_file_ck)
+    if result_ck_df is None:
+        connection_ck.close()
+        return
+
     # Save the result to an Excel file
     sheet1 = "All ADM-v5 Devices"
     sheet2 = "All Legacy Devices"
 #    sheet3 = "All AirVend Devices"
-    save_to_excel([result_v5_df, result_leg_df], filename, [sheet1, sheet2])
+    sheet4 = "All CompanyKitchen Devices"
+#    save_to_excel([result_v5_df, result_leg_df, result_ck_df], filename, [sheet1, sheet2, sheet4])
+    save_to_excel([result_ck_df], filename, [sheet4])
 
 
-# KioskAge Report - 365rm - Writer
+# KioskAge Report
 def kiosk_age_report_writer(filename):
     # Get the SQL query
     query_file_v5 = "./queries/KioskAge_v5_Report.sql"
     query_file_rt = "./queries/KioskAge_RT_Report.sql"
 
-    # Connect to the database
+    # Connect to the v5 / RT database
     connection_v5 = connect_to_v5_database()
     if connection_v5 is None:
         return

@@ -155,14 +155,13 @@ FROM Kiosk k
 
 	-- Needs Optimization
 	-- Get the Card Processor (Adds about 18 seconds to the query of ~60k)
-	LEFT JOIN sosdb.lookupstr cp	ON k.PROCESSOR1 = cp.KEYSTR AND CP.TYPE = 'CCPROCESSOR'
+	LEFT JOIN (select * from sosdb.lookupstr where type = 'CCPROCESSOR') cp ON k.PROCESSOR1 = cp.KEYSTR
 
 	-- Get the CC Firmware & Config from DashDB (adds about 58 seconds to the query of about ~60k devices)
 	LEFT JOIN (
 		SELECT h.KIOSKNAME
-			,h.KIOSKINFO
-			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.otifirmware'),CHAR(34), "")		AS OTIFIRMWARE
-			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.oticonfig'),CHAR(34), "")			AS OTICONFIG
+			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.otifirmware'),CHAR(34), "")	AS OTIFIRMWARE
+			,REPLACE(JSON_EXTRACT(h.KIOSKINFO, '$.oticonfig'),CHAR(34), "")		AS OTICONFIG
 		FROM dashdb.hostinfo h
 			INNER JOIN (
 				SELECT KIOSKNAME, MAX(LASTUPDATED) AS LASTUPDATED
@@ -170,8 +169,6 @@ FROM Kiosk k
 				GROUP BY KIOSKNAME
 			) AS u ON h.KIOSKNAME = u.KIOSKNAME AND h.LASTUPDATED = u.LASTUPDATED
 		WHERE JSON_VALID(h.kioskinfo) = 1 AND h.KIOSKINFO IS NOT NULL
-		GROUP BY h.KIOSKNAME, h.kioskinfo
 	) AS h ON k.NAME = h.KIOSKNAME
-
 
 ORDER BY sfe.OpGroup, sfediv.Value, o.Name, l.Name, k.type
