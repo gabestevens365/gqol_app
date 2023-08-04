@@ -1,84 +1,63 @@
 SELECT
 	-- Information: Top Level --
-	'365 Retail Markets'		AS	'Platform Parent'
-	,'CompanyKitchen'				AS	'Platform'
-	,''											AS	'LOB'
-	,''											AS	'1'
-	-- Information: Location --
-	,b.businessid						AS	'Location ID'
-	,b.businessname					AS	'Location Name'
-	,''											AS	'Location Brand'
-	,b.street								AS	'Location Address'
-	,b.city									AS	'Location City'
-	,b.state								AS	'Location State'
-	,b.zip									AS	'Location Zip'
-	,b.country							AS	'Location Country'
-	,''											AS	'Location Currency'
-	,''											AS	'Location Campus/GMA Name'
-	,''											AS	'Location GMA'
-	,''											AS	'Location Go-Live'
-	,''											AS	'2'
+	''									AS	'Quick Ref'
+	,'365 Retail Markets'				AS  'Platform Parent'
+	,'CompanyKitchen'					AS	'Platform'
+	,''									AS	'Operator Group'
+	,d.districtname						AS  'Operator District'
+	,c.companyname						AS	'Operator Name'
+	,b.businessname						AS	'Location Name'
+	,cp.name							AS	'Terminal Name'
+	,cp.client_programid				AS	'Serial / TID'
 	-- Information: Operation --
-	,''											AS	'Operation Group'
-	,''											AS	'Operation Sage ID'
-	,c.companyid						AS	'Operation ID'
-	,''											AS	'Operation Accounting ID'
-	,c.companyname					AS	'Operation Name'
-	,c.street								AS	'Operation Address'
-	,c.city									AS	'Operation City'
-	,c.state								AS	'Operation State'
-	,c.zip									AS	'Operation Zip'
-	,''											AS	'Operation Country'
-	,''											AS	'3'
+	,''									AS	'Op Info'
+	,c.companyid						AS	'Op ID'
+	,c.companyname						AS	'Op Name'
+	,c.street							AS	'Op Address'
+	,c.city								AS	'Op City'
+	,c.state							AS	'Op State'
+	,c.zip								AS	'Op Zip'
+	-- Information: Location --
+	,''									AS	'Loc Info'
+	,b.businessid						AS	'Loc ID'
+	,b.businessname						AS	'Loc Name'
+	,cp.name							AS	'Loc Terminal Name'
+	,b.street							AS	'Loc Address'
+	,b.city								AS	'Loc City'
+	,b.state							AS	'Loc State'
+	,b.zip								AS	'Loc Zip'
+	,b.country							AS	'Loc Country'
 	-- Information: Device --
-	,cp.client_programid		AS	'Device Serial'
-	,CASE
-		WHEN cp.pos_type = 7 THEN 'Aeris'
-		WHEN cp.pos_type = 8 THEN 'Blaster'
-		WHEN cp.pos_type = 9 THEN 'Tractor Beam'
-		ELSE 'Testing/Other'
-	END											AS	'Device Model'
-	,''											AS	'Device CC Reader'
-	,''											AS	'Device CC Reader Firmware'
-	,CASE
-		WHEN b.closed = 0 THEN 'Active'
-		WHEN b.closed = 1 THEN 'Closed'
-		ELSE 'Unknown'
-	END											AS	'Device (OP) Status'
+	,''									AS  'Device Info'
+	,cp.client_programid				AS	'Device TID (Serial)'
+	,bc.category_name					AS	'Device Type'
+	,pt.Name							AS	'Device Model'
+	,kdc.device_name					AS	'Device CC Reader'
+	,kdc.additional_configuration		AS	'Device CC Terminal'
 	,cp.send_time						AS 	'Device Last Sync'
-	,''											AS	'Device Last Sale'
-	,''											AS	'Device Go-Live'
-	,''											AS	'4'
-	-- Information: OS & Apps --
-	,''											AS	'App OS Ver'
-	,''											AS	'App POS'
-	,''											AS	'App POS Ver'
-	,''											AS	'App Anti-Malware'
-	,''											AS	'App Anti-Malware Version'
-	,''											AS	'App Anti-Malware Definition Date'
-	,''											AS	'App Biometric Policy'
-	,''											AS	'App Biometric Policy Version'
-	,''											AS	'App Privacy Policy'
-	,''											AS	'App Privacy Policy Version'
-	,''											AS	'App TermsOfService'
-	,''											AS	'App TermsOfService Version'
---	,bc.category_name				AS category
---	,kdc.device_name					as castle_config
-	,cp2.parent AS terminal_parent
 FROM	mburris_businesstrack.company c
 	JOIN mburris_businesstrack.business b	ON b.companyid = c.companyid
 	LEFT JOIN mburris_businesstrack.business_category bc ON bc.categoryid = b.categoryid
 	LEFT JOIN mburris_manage.client_programs cp ON cp.businessid = b.businessid
-    LEFT JOIN mburris_manage.client_programs cp2 ON cp2.client_programid = cp.parent
-	LEFT JOIN snoke.kiosk_device_configuration kdc ON kdc.terminal_id = cp.client_programid
-		AND device_type = 'msr'
-		AND device_name = 'castle'
+	-- Get the credit card reader type
+	LEFT JOIN snoke.kiosk_device_configuration kdc ON kdc.terminal_id = cp.client_programid AND device_type = 'msr'
+	-- Get the POS Device Types
+	LEFT JOIN mburris_manage.pos_type pt ON cp.pos_type = pt.pos_type
+	-- Get the District Names
+	LEFT JOIN mburris_businesstrack.district d ON b.districtid = d.districtid
+
 WHERE b.closed = 0
 	AND bc.category_name = 'Kiosk'
+	AND pt.name != 'TractorBeam'
 	AND b.businessname NOT LIKE '[%]%'
-	AND b.businessname NOT LIKE 'zKiosk%'
-	AND b.businessname NOT LIKE 'zBeaconKiosk%'
+	AND b.businessname NOT LIKE 'z%'
 	AND b.businessname NOT LIKE 'test kiosk%'
 	AND b.businessname NOT LIKE '|Vend%'
 	AND b.businessname NOT LIKE 'Blank Unit'
+	AND b.businessname NOT LIKE 'ADM%'
+	AND b.businessname NOT LIKE 'BEA%'
+	AND b.businessname NOT LIKE 'SPARE%'
+	AND c.companyname != 'CKL - TEST Company'
   AND cp.parent IS NOT NULL
+  AND cp.parent != 2198
+ORDER BY d.districtname, c.companyname, b.businessname, cp.send_time DESC

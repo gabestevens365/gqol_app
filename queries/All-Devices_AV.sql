@@ -19,8 +19,8 @@ SELECT
 	-- Information: Location --
 	,''										AS	'Loc Info'
 	,CASE
-		d.Deactivated WHEN 1 THEN 0
-		WHEN 0 THEN 1
+		d.Deactivated WHEN 1 THEN 'Inactive'
+		WHEN 0 THEN 'Active'
 	END										AS  'Loc IsActive'
 	,m.Name									AS	'Loc Name'
 	,m.Address1								AS	'Loc Address'
@@ -64,11 +64,14 @@ SELECT
 	,''										AS	'Anti-Malware Name'
 	,''										AS	'Anti-Malware Version'
 	,''										AS	'Anti-Malware Definition Date'
-from Machine m
-	INNER JOIN Company c on c.Id = m.CompanyId
-	INNER JOIN Device d on d.Id = m.DeviceId
-	INNER JOIN (SELECT [DeviceId] ,MAX(ActivationDate) AS ActivationDate FROM [airvend_kentico].[dbo].[Activation]
-                                        GROUP BY DeviceId) a ON a.DeviceId=d.DeviceId
-	INNER JOIN DeviceConfig dc on dc.Id = d.Id
+from Machine (nolock) m
+	INNER JOIN Company (nolock) c on c.Id = m.CompanyId
+	INNER JOIN Device (nolock) d on d.Id = m.DeviceId
+	INNER JOIN (
+	    SELECT [DeviceId] ,MAX(ActivationDate) AS ActivationDate
+	    FROM [airvend_kentico].[dbo].[Activation] (nolock)
+        GROUP BY DeviceId
+    ) a ON a.DeviceId=d.DeviceId
+	INNER JOIN DeviceConfig (nolock) dc on dc.Id = d.Id
 where m.IsDeleted = 0 and c.IsDeleted = 0 and c.IsTest = 0
 order by c.MasterAccountName, c.Name, m.Name

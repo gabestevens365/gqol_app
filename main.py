@@ -4,7 +4,7 @@ from datetime import date, datetime
 import mysql.connector
 import pyodbc
 import pandas as pd
-
+import xlsxwriter
 
 # Function to connect to the ADM/v5 MySQL database
 def connect_to_v5_database():
@@ -62,29 +62,33 @@ def connect_to_av_database():
 
 # Function to connect to the CompanyKitchen MySQL database
 def connect_to_ck_database():
-    from credentials.credentials_sosdb import ck_host, ck_port, ck_username, ck_password, ck_database, \
-        ck_ssh_host, ck_ssh_port, ck_ssh_username, ck_ssh_password
-    import paramiko
+    from credentials.credentials_sosdb import ck_host, ck_port, ck_username, ck_password, ck_database
+
     try:
-        # SSH tunnel setup
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(ck_ssh_host, port=ck_ssh_port, username=ck_ssh_username, password=ck_ssh_password)
+        # Pause and prompt the user to connect to the SSH tunnel using PowerShell
+        print("Before connecting to the CompanyKitchen (MySQL) database, \
+please open PowerShell and start the SSH tunnel.")
+        print("Once the tunnel is active, press 'C' to continue or 'Q' to quit.")
 
-
-        # Open SSH tunnel
-        ssh_tunnel = ssh_client.get_transport().open_channel('direct-tcpip', dest_addr=(ck_host, ck_port),
-                                                             src_addr=('', 0))
-        mysql.connector.raise_on_warnings = True
-        conn = mysql.connector.connect(
-            host=ck_host,
-            port=ck_port,
-            user=ck_username,
-            password=ck_password,
-            database=ck_database,
-            unix_socket=ssh_tunnel)
-        print(f"Connected to the CompanyKitchen (MySQL) database successfully!")
-        return conn
+        while True:
+            user_input = input().lower()
+            if user_input == 'c':
+                # Try connecting to the CK database
+                mysql.connector.raise_on_warnings = True
+                conn = mysql.connector.connect(
+                    host=ck_host,
+                    port=ck_port,
+                    user=ck_username,
+                    password=ck_password,
+                    database=ck_database
+                )
+                print(f"Connected to the CompanyKitchen (MySQL) database successfully!")
+                return conn
+            elif user_input == 'q':
+                print("Quitting the program.")
+                return None
+            else:
+                print("Invalid input. Press 'C' to continue or 'Q' to quit.")
     except mysql.connector.Error as error:
         print(f"Failed to connect to the CompanyKitchen (MySQL) database: {error}")
         return None
@@ -120,15 +124,47 @@ def execute_query(conn, query_file):
         query_endtime = datetime.now()
         query_elapsed = (query_endtime - query_starttime).total_seconds()
         print(f"Ending the {query_file} query at {query_endtime.strftime('%Y-%m-%d @ %H:%M:%S')}"
-              f", elapsed time: {int(query_elapsed)} seconds.")
+              f", elapsed time: {int(query_elapsed)} seconds.\n")
         return df
     except mysql.connector.Error as error:
-        print(f"Failed to execute the {query_file} query: {error}")
+        print(f"Failed to execute the {query_file} query: {error}\n")
         return None
+
+
+# Format the Worksheet
+def format_worksheet(workbook, worksheet, df):
+    format_gray = workbook.add_format({'pattern': 18, 'bg_color': '#CCCCCC'})
+    format_red = workbook.add_format({'bg_color': '#FFB6C1'})
+    format_orange = workbook.add_format({'bg_color': '#FFE4B5'})
+    format_yellow = workbook.add_format({'bg_color': '#FFFFE0'})
+    format_green = workbook.add_format({'bg_color': '#BDFCC9'})
+    format_blue = workbook.add_format({'bg_color': '#BFEFFF'})
+    format_purple = workbook.add_format({'bg_color': '#E6E6FA'})
+
+    formats = [format_red, format_orange, format_yellow, format_green, format_blue, format_purple]
+
+    for col_index, col_header in enumerate(df.columns, start=1):
+        if col_header.strip().endswith(" Info") or col_header.strip() == "Quick Ref":
+            worksheet.set_column(col_index - 1, col_index - 1, None, format_gray)
+
+    start_col = None
+    end_col = None
+
+    for col_index, col_header in enumerate(df.columns, start=1):
+        if col_header.strip() == "Quick Ref":
+            start_col = col_index
+        elif col_header.strip().endswith(" Info") and start_col is not None:
+            end_col = col_index - 1
+            break
+
+    if start_col is not None and end_col is not None:
+        for col_index in range(start_col, end_col + 1):
+            worksheet.write(0, col_index - 1, df.columns[col_index - 1], formats[0])
 
 
 # Function to save a DataFrame as an Excel file
 def save_to_excel(dataframes, file_name, sheet_names):
+    print("Formatting and Saving. Please wait...")
     try:
         if len(dataframes) != len(sheet_names):
             raise ValueError("Number of dataframes and sheet names must be equal.")
@@ -143,20 +179,13 @@ def save_to_excel(dataframes, file_name, sheet_names):
                 # Freeze the top rows
                 worksheet.freeze_panes(1, 0)
 
-                # Auto-Width for each column, with a max of 60.
-                for i, col in enumerate(df.columns):
-                    column_width = max(df[col].astype(str).map(len).max(), len(col))
-                    if column_width > 59:
-                        column_width = 59
-                    worksheet.set_column(i, i, column_width + 1)
-
                 # Format specific sheets
                 format_red = workbook.add_format({'bg_color': '#FFB6C1'})
                 format_orange = workbook.add_format({'bg_color': '#FFE4B5'})
                 format_yellow = workbook.add_format({'bg_color': '#FFFFE0'})
                 format_green = workbook.add_format({'bg_color': '#BDFCC9'})
                 format_blue = workbook.add_format({'bg_color': '#BFEFFF'})
-#                format_purple = workbook.add_format({'bg_color': '#E6E6FA'})
+                format_purple = workbook.add_format({'bg_color': '#E6E6FA'})
                 format_gray = workbook.add_format({'pattern': 18, 'bg_color': '#CCCCCC'})
                 if sheet_name == 'All ADM-v5 Devices':
                     worksheet.set_column('A:A', None, format_gray)
@@ -191,6 +220,15 @@ def save_to_excel(dataframes, file_name, sheet_names):
                     worksheet.conditional_format('AA1:AJ1', {'type': 'no_blanks', 'format': format_green})
                     worksheet.set_column('AK:AK', None, format_gray)
                     worksheet.conditional_format('AK1:AQ1', {'type': 'no_blanks', 'format': format_blue})
+                elif sheet_name == 'All CompanyKitchen Devices':
+                    worksheet.set_column('A:A', None, format_gray)
+                    worksheet.conditional_format('A1:I1', {'type': 'no_blanks', 'format': format_red})
+                    worksheet.set_column('J:J', None, format_gray)
+                    worksheet.conditional_format('J1:P1', {'type': 'no_blanks', 'format': format_orange})
+                    worksheet.set_column('Q:Q', None, format_gray)
+                    worksheet.conditional_format('Q1:Y1', {'type': 'no_blanks', 'format': format_yellow})
+                    worksheet.set_column('Z:Z', None, format_gray)
+                    worksheet.conditional_format('Z1:AF1', {'type': 'no_blanks', 'format': format_green})
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -254,7 +292,13 @@ def report_builder(report_path, report_name):
     report_exists = find_latest_report(report_path, report_name, report_date)
     if report_exists is None:
         print(f"Generating the first copy of {report_name} for {report_date}.")
-        alldevice_report_365rm_writer(final_file_name)
+        if report_name == "All_Devices_Report":
+            alldevice_report_365rm_writer(final_file_name)
+        elif report_name == "KioskAge_Report":
+            kiosk_age_report_writer(final_file_name)
+        else:
+            print("There is a problem in the Report Name.")
+            main_menu()
     else:
         print(f"{report_path}{report_exists} already exists!\n")
         choice = input("Do you want to generate a new copy? [Y/N]: ")
@@ -262,7 +306,13 @@ def report_builder(report_path, report_name):
 
         if choice == "Y":
             print(f"Generating a new copy of {report_name} for {report_date}.")
-            alldevice_report_365rm_writer(final_file_name)
+            if report_name == "All_Devices_Report":
+                alldevice_report_365rm_writer(final_file_name)
+            elif report_name == "KioskAge_Report":
+                kiosk_age_report_writer(final_file_name)
+            else:
+                print("There is a problem in the Report Name.")
+                main_menu()
         elif choice == "N":
             main_menu()
         else:
@@ -275,41 +325,41 @@ def alldevice_report_365rm_writer(filename):
     # MySQL query
     query_file_v5 = "./queries/All-Devices_v5.sql"
     query_file_leg = "./queries/All-Devices_Legacy.sql"
-#    query_file_av = "./queries/All-Devices_AV.sql"
+    query_file_av = "./queries/All-Devices_AV.sql"
     query_file_ck = "./queries/All-Devices_CK.sql"
 
     # Connect to the v5 database
-#    connection_v5 = connect_to_v5_database()
-#    if connection_v5 is None:
-#        return
+    connection_v5 = connect_to_v5_database()
+    if connection_v5 is None:
+        return
 
     # Execute the v5 query
-#    result_v5_df = execute_query(connection_v5, query_file_v5)
-#    if result_v5_df is None:
-#        connection_v5.close()
-#        return
+    result_v5_df = execute_query(connection_v5, query_file_v5)
+    if result_v5_df is None:
+        connection_v5.close()
+        return
 
     # Connect to the Legacy database
-#    connection_leg = connect_to_leg_database()
-#    if connection_leg is None:
-#        return
+    connection_leg = connect_to_leg_database()
+    if connection_leg is None:
+        return
 
     # Execute the Legacy query
-#    result_leg_df = execute_query(connection_leg, query_file_leg)
-#    if result_leg_df is None:
-#        connection_leg.close()
-#        return
+    result_leg_df = execute_query(connection_leg, query_file_leg)
+    if result_leg_df is None:
+        connection_leg.close()
+        return
 
     # Connect to the AV database
-#    connection_av = connect_to_av_database()
-#    if connection_av is None:
-#        return
+    connection_av = connect_to_av_database()
+    if connection_av is None:
+        return
 
     # Execute the AV query
-#    result_av_df = execute_query(connection_av, query_file_av)
-#    if result_av_df is None:
-#        connection_av.close()
-#        return
+    result_av_df = execute_query(connection_av, query_file_av)
+    if result_av_df is None:
+        connection_av.close()
+        return
 
     # Connect to the CompanyKitchen database
     connection_ck = connect_to_ck_database()
@@ -318,6 +368,7 @@ def alldevice_report_365rm_writer(filename):
 
     # Execute the CompanyKitchen query
     result_ck_df = execute_query(connection_ck, query_file_ck)
+    print("Please disconnect from the SSH tunnel at your convenience.")
     if result_ck_df is None:
         connection_ck.close()
         return
@@ -325,10 +376,10 @@ def alldevice_report_365rm_writer(filename):
     # Save the result to an Excel file
     sheet1 = "All ADM-v5 Devices"
     sheet2 = "All Legacy Devices"
-#    sheet3 = "All AirVend Devices"
+    sheet3 = "All AirVend Devices"
     sheet4 = "All CompanyKitchen Devices"
-#    save_to_excel([result_v5_df, result_leg_df, result_ck_df], filename, [sheet1, sheet2, sheet4])
-    save_to_excel([result_ck_df], filename, [sheet4])
+    save_to_excel([result_v5_df, result_leg_df, result_av_df, result_ck_df], filename, [sheet1, sheet2, sheet3, sheet4])
+ #   save_to_excel([result_ck_df], filename, [sheet4])
 
 
 # KioskAge Report
