@@ -35,6 +35,14 @@ SELECT
 	,kdc.device_name					AS	'Device CC Reader'
 	,kdc.additional_configuration		AS	'Device CC Terminal'
 	,cp.send_time						AS 	'Device Last Sync'
+	,''                                 AS  'App Info'
+	,''                                 AS  'OS Version'
+	,''                                 AS  'Anti-Malware'
+	,''                                 AS  'Anti-Malware Version'
+	,''                                 AS  'Anti-Malware Definition Date'
+	,r.terms							AS	'Policy: Terms'
+	,r.privacy							AS	'Policy: Privacy'
+	,r.biometric						AS	'Policy: Biometric'
 FROM	mburris_businesstrack.company c
 	JOIN mburris_businesstrack.business b	ON b.companyid = c.companyid
 	LEFT JOIN mburris_businesstrack.business_category bc ON bc.categoryid = b.categoryid
@@ -45,6 +53,16 @@ FROM	mburris_businesstrack.company c
 	LEFT JOIN mburris_manage.pos_type pt ON cp.pos_type = pt.pos_type
 	-- Get the District Names
 	LEFT JOIN mburris_businesstrack.district d ON b.districtid = d.districtid
+	-- Get the Policies
+	LEFT JOIN (
+		SELECT
+			state,
+			MAX(IF(notice_type = 'terms', VERSION, NULL)) AS terms,
+			MAX(IF(notice_type = 'privacy', VERSION, NULL)) AS privacy,
+			MAX(IF(notice_type = 'biometric', VERSION, NULL)) AS biometric
+		FROM mburris_businesstrack.regulatory_notice_by_state
+		GROUP BY state
+		) r ON b.state = r.state
 
 WHERE b.closed = 0
 	AND bc.category_name = 'Kiosk'

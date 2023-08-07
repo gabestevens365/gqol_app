@@ -4,7 +4,8 @@ from datetime import date, datetime
 import mysql.connector
 import pyodbc
 import pandas as pd
-import xlsxwriter
+from openpyxl.utils import get_column_letter, column_index_from_string
+
 
 # Function to connect to the ADM/v5 MySQL database
 def connect_to_v5_database():
@@ -60,35 +61,51 @@ def connect_to_av_database():
         return None
 
 
+# Function to test if an SSH tunnel is already established.
+def check_ssh_tunnel(port):
+    import psutil
+
+    """Check if an SH tunnel is already established on the specified port."""
+    established_connections = [conn for conn in psutil.net_connections() if conn.status == 'LISTEN']
+    for conn in established_connections:
+        if conn.laddr.port == port:
+            return True
+    return False
+
+
 # Function to connect to the CompanyKitchen MySQL database
 def connect_to_ck_database():
     from credentials.credentials_sosdb import ck_host, ck_port, ck_username, ck_password, ck_database
 
     try:
-        # Pause and prompt the user to connect to the SSH tunnel using PowerShell
-        print("Before connecting to the CompanyKitchen (MySQL) database, \
-please open PowerShell and start the SSH tunnel.")
-        print("Once the tunnel is active, press 'C' to continue or 'Q' to quit.")
+        # Check if the SSH tunnel is alraedy active
+        if not check_ssh_tunnel(3309):
+            # Pause and prompt the user to connect to the SSH tunnel using PowerShell
+            print("Before connecting to the CompanyKitchen (MySQL) database, \
+please open PowerShell and start the SSH tunnel on port 3309.")
+            print("Once the tunnel is active, press 'C' to continue or 'Q' to quit.")
 
-        while True:
-            user_input = input().lower()
-            if user_input == 'c':
-                # Try connecting to the CK database
-                mysql.connector.raise_on_warnings = True
-                conn = mysql.connector.connect(
-                    host=ck_host,
-                    port=ck_port,
-                    user=ck_username,
-                    password=ck_password,
-                    database=ck_database
-                )
-                print(f"Connected to the CompanyKitchen (MySQL) database successfully!")
-                return conn
-            elif user_input == 'q':
-                print("Quitting the program.")
-                return None
-            else:
-                print("Invalid input. Press 'C' to continue or 'Q' to quit.")
+            while True:
+                user_input = input().lower()
+                if user_input == 'c':
+                    break
+                elif user_input == 'q':
+                    print("Quitting the program.")
+                    return None
+                else:
+                    print("Invalid input. Press 'C' to continue or 'Q' to quit.")
+
+        # Try connecting to the CK database
+        mysql.connector.raise_on_warnings = True
+        conn = mysql.connector.connect(
+            host=ck_host,
+            port=ck_port,
+            user=ck_username,
+            password=ck_password,
+            database=ck_database
+        )
+        print(f"Connected to the CompanyKitchen (MySQL) database successfully!")
+        return conn
     except mysql.connector.Error as error:
         print(f"Failed to connect to the CompanyKitchen (MySQL) database: {error}")
         return None
@@ -131,8 +148,8 @@ def execute_query(conn, query_file):
         return None
 
 
-# Format the Worksheet
-def format_worksheet(workbook, worksheet, df):
+# Function to format the worksheet
+def format_worksheet(df, workbook, worksheet):
     format_gray = workbook.add_format({'pattern': 18, 'bg_color': '#CCCCCC'})
     format_red = workbook.add_format({'bg_color': '#FFB6C1'})
     format_orange = workbook.add_format({'bg_color': '#FFE4B5'})
@@ -143,23 +160,24 @@ def format_worksheet(workbook, worksheet, df):
 
     formats = [format_red, format_orange, format_yellow, format_green, format_blue, format_purple]
 
-    for col_index, col_header in enumerate(df.columns, start=1):
-        if col_header.strip().endswith(" Info") or col_header.strip() == "Quick Ref":
-            worksheet.set_column(col_index - 1, col_index - 1, None, format_gray)
+    info_cols = [get_column_letter(i+1) for i, col in enumerate(df.columns) if col.endswith(" Info")]
+    last_col = get_column_letter(df.shape[1])
 
-    start_col = None
-    end_col = None
+    # Apply formatting to the first column, and all the info_cols
+    worksheet.set_column('A:A', None, format_gray)
+    for col_letter in info_cols:
+        worksheet.set_column(f'{col_letter}:{col_letter}', None, format_gray)
 
-    for col_index, col_header in enumerate(df.columns, start=1):
-        if col_header.strip() == "Quick Ref":
-            start_col = col_index
-        elif col_header.strip().endswith(" Info") and start_col is not None:
-            end_col = col_index - 1
-            break
-
-    if start_col is not None and end_col is not None:
-        for col_index in range(start_col, end_col + 1):
-            worksheet.write(0, col_index - 1, df.columns[col_index - 1], formats[0])
+    # Apply additional formatting to the header row
+    start_col = 'A'
+    for i, info_col in enumerate(info_cols):
+        end_col = get_column_letter(column_index_from_string(info_col) - 1)
+        worksheet.conditional_format(f'{start_col}1:{end_col}1',
+                                     {'type': 'no_blanks', 'format': formats[i % len(formats)]})
+        start_col = info_col
+    # Apply conditional formatting from the last " Info" column to the last column in the dataframe
+    worksheet.conditional_format(f'{start_col}1:{last_col}1',
+                                 {'type': 'no_blanks', 'format': formats[len(info_cols) % len(formats)]})
 
 
 # Function to save a DataFrame as an Excel file
@@ -179,56 +197,21 @@ def save_to_excel(dataframes, file_name, sheet_names):
                 # Freeze the top rows
                 worksheet.freeze_panes(1, 0)
 
+                # Auto-width columns
+                for i, col in enumerate(df.columns):
+                    column_len = max(df[col].astype(str).str.len().max(), len(col))
+                    column_len = min(column_len, 59)  # limit column width to 59
+                    worksheet.set_column(i, i, column_len)
+
                 # Format specific sheets
-                format_red = workbook.add_format({'bg_color': '#FFB6C1'})
-                format_orange = workbook.add_format({'bg_color': '#FFE4B5'})
-                format_yellow = workbook.add_format({'bg_color': '#FFFFE0'})
-                format_green = workbook.add_format({'bg_color': '#BDFCC9'})
-                format_blue = workbook.add_format({'bg_color': '#BFEFFF'})
-                format_purple = workbook.add_format({'bg_color': '#E6E6FA'})
-                format_gray = workbook.add_format({'pattern': 18, 'bg_color': '#CCCCCC'})
                 if sheet_name == 'All ADM-v5 Devices':
-                    worksheet.set_column('A:A', None, format_gray)
-                    worksheet.conditional_format('A1:H1', {'type': 'no_blanks', 'format': format_red})
-                    worksheet.set_column('I:I', None, format_gray)
-                    worksheet.conditional_format('I1:R1', {'type': 'no_blanks', 'format': format_orange})
-                    worksheet.set_column('S:S', None, format_gray)
-                    worksheet.conditional_format('S1:AC1', {'type': 'no_blanks', 'format': format_yellow})
-                    worksheet.set_column('AD:AD', None, format_gray)
-                    worksheet.conditional_format('AD1:AO1', {'type': 'no_blanks', 'format': format_green})
-                    worksheet.set_column('AP:AP', None, format_gray)
-                    worksheet.conditional_format('AP1:AX1', {'type': 'no_blanks', 'format': format_blue})
+                    format_worksheet(df, workbook, worksheet)
                 elif sheet_name == 'All Legacy Devices':
-                    worksheet.set_column('A:A', None, format_gray)
-                    worksheet.conditional_format('A1:G1', {'type': 'no_blanks', 'format': format_red})
-                    worksheet.set_column('H:H', None, format_gray)
-                    worksheet.conditional_format('H1:P1', {'type': 'no_blanks', 'format': format_orange})
-                    worksheet.set_column('Q:Q', None, format_gray)
-                    worksheet.conditional_format('Q1:AB1', {'type': 'no_blanks', 'format': format_yellow})
-                    worksheet.set_column('AC:AC', None, format_gray)
-                    worksheet.conditional_format('AC1:AK1', {'type': 'no_blanks', 'format': format_green})
-                    worksheet.set_column('AL:AL', None, format_gray)
-                    worksheet.conditional_format('AL1:AW1', {'type': 'no_blanks', 'format': format_blue})
+                    format_worksheet(df, workbook, worksheet)
                 elif sheet_name == 'All AirVend Devices':
-                    worksheet.set_column('A:A', None, format_gray)
-                    worksheet.conditional_format('A1:G1', {'type': 'no_blanks', 'format': format_red})
-                    worksheet.set_column('H:H', None, format_gray)
-                    worksheet.conditional_format('H1:O1', {'type': 'no_blanks', 'format': format_orange})
-                    worksheet.set_column('P:P', None, format_gray)
-                    worksheet.conditional_format('P1:Z1', {'type': 'no_blanks', 'format': format_yellow})
-                    worksheet.set_column('AA:AA', None, format_gray)
-                    worksheet.conditional_format('AA1:AJ1', {'type': 'no_blanks', 'format': format_green})
-                    worksheet.set_column('AK:AK', None, format_gray)
-                    worksheet.conditional_format('AK1:AQ1', {'type': 'no_blanks', 'format': format_blue})
+                    format_worksheet(df, workbook, worksheet)
                 elif sheet_name == 'All CompanyKitchen Devices':
-                    worksheet.set_column('A:A', None, format_gray)
-                    worksheet.conditional_format('A1:I1', {'type': 'no_blanks', 'format': format_red})
-                    worksheet.set_column('J:J', None, format_gray)
-                    worksheet.conditional_format('J1:P1', {'type': 'no_blanks', 'format': format_orange})
-                    worksheet.set_column('Q:Q', None, format_gray)
-                    worksheet.conditional_format('Q1:Y1', {'type': 'no_blanks', 'format': format_yellow})
-                    worksheet.set_column('Z:Z', None, format_gray)
-                    worksheet.conditional_format('Z1:AF1', {'type': 'no_blanks', 'format': format_green})
+                    format_worksheet(df, workbook, worksheet)
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -368,7 +351,7 @@ def alldevice_report_365rm_writer(filename):
 
     # Execute the CompanyKitchen query
     result_ck_df = execute_query(connection_ck, query_file_ck)
-    print("Please disconnect from the SSH tunnel at your convenience.")
+    print("Don't forget to disconnect the CK SSH tunnel on 3309.")
     if result_ck_df is None:
         connection_ck.close()
         return
@@ -379,7 +362,6 @@ def alldevice_report_365rm_writer(filename):
     sheet3 = "All AirVend Devices"
     sheet4 = "All CompanyKitchen Devices"
     save_to_excel([result_v5_df, result_leg_df, result_av_df, result_ck_df], filename, [sheet1, sheet2, sheet3, sheet4])
- #   save_to_excel([result_ck_df], filename, [sheet4])
 
 
 # KioskAge Report
