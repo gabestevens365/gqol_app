@@ -8,6 +8,7 @@ SELECT
     o.Country                   AS	"Country",
     o.NAME                      AS	"Operation Name",
     l.NAME                      AS	"Location Name",
+	l.LocationNumber			AS	"Loc Cost Center",
     k.NAME                      AS	"Device Serial",
     CASE k.HWTYPE
         WHEN 'GEN3'             THEN 'Gen3'

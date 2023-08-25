@@ -8,6 +8,7 @@ SELECT
     ,o.COUNTRY                      AS  "Country"
     ,COALESCE(o.NAME, 'Orphan Op')  AS  "Operation Name"
     ,COALESCE(l.NAME, 'Orphan Loc') AS  "Location Name"
+	,l.LocationNumber			    AS	"Loc Cost Center"
     ,k.NAME                         AS  "Device Serial"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
@@ -96,6 +97,7 @@ SELECT
     ,o.COUNTRY                      AS  "Country"
     ,COALESCE(o.NAME, 'Orphan Op')  AS  "Operation Name"
     ,COALESCE(l.NAME, 'Orphan Loc') AS  "Location Name"
+	,l.LocationNumber				AS	"Loc Cost Center"
     ,k.NAME                         AS  "Device Serial"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'

@@ -78,7 +78,7 @@ def connect_to_ck_database():
     from credentials.credentials_sosdb import ck_host, ck_port, ck_username, ck_password, ck_database
 
     try:
-        # Check if the SSH tunnel is alraedy active
+        # Check if the SSH tunnel is already active
         if not check_ssh_tunnel(3309):
             # Pause and prompt the user to connect to the SSH tunnel using PowerShell
             print("Before connecting to the CompanyKitchen (MySQL) database, \
@@ -108,6 +108,24 @@ please open PowerShell and start the SSH tunnel on port 3309.")
         return conn
     except mysql.connector.Error as error:
         print(f"Failed to connect to the CompanyKitchen (MySQL) database: {error}")
+        return None
+
+
+def connect_to_avanti_database():
+    from credentials.credentials_sosdb import avanti_server, avanti_database, avanti_uid, avanti_pwd
+    try:
+        conn = pyodbc.connect(
+            'DRIVER={ODBC Driver 17 for SQL Server};'
+            f'SERVER={avanti_server};'
+            f'DATABASE={avanti_database};'
+            'Authentication=ActiveDirectoryPassword;'
+            f'UID={avanti_uid};'
+            f'PWD={avanti_pwd};'
+        )
+        print(f"Connected to the Avanti (MsSQL / Azure Synapse) database successfully!")
+        return conn
+    except pyodbc.Error as error:
+        print(f"Failed to connect to the Avanti (MsSQL / Azure Synapse) database: {error}")
         return None
 
 
@@ -212,6 +230,8 @@ def save_to_excel(dataframes, file_name, sheet_names):
                     format_worksheet(df, workbook, worksheet)
                 elif sheet_name == 'All CompanyKitchen Devices':
                     format_worksheet(df, workbook, worksheet)
+                elif sheet_name == 'All Avanti Devices':
+                    format_worksheet(df, workbook, worksheet)
 
         print(f"Data saved to '{file_name}' successfully!")
         main_menu()
@@ -310,6 +330,7 @@ def alldevice_report_365rm_writer(filename):
     query_file_leg = "./queries/All-Devices_Legacy.sql"
     query_file_av = "./queries/All-Devices_AV.sql"
     query_file_ck = "./queries/All-Devices_CK.sql"
+    query_file_avanti = "/queries/All-Devices_Avanti.sql"
 
     # Connect to the v5 database
     connection_v5 = connect_to_v5_database()
@@ -356,12 +377,27 @@ def alldevice_report_365rm_writer(filename):
         connection_ck.close()
         return
 
+    '''
+    # Connect to the Avanti Data-Warehouse
+    connection_avanti = connect_to_avanti_database()
+    if connection_avanti is None:
+        return
+
+    # Execute the Avanti Query
+    result_avanti_df = execute_query(connection_avanti, query_file_avanti)
+    if result_avanti_df is None:
+        connection_avanti.close()
+        return
+    '''
+
     # Save the result to an Excel file
     sheet1 = "All ADM-v5 Devices"
     sheet2 = "All Legacy Devices"
     sheet3 = "All AirVend Devices"
     sheet4 = "All CompanyKitchen Devices"
-    save_to_excel([result_v5_df, result_leg_df, result_av_df, result_ck_df], filename, [sheet1, sheet2, sheet3, sheet4])
+    # sheet5 = "All Avanti Devices"
+    save_to_excel([result_v5_df, result_leg_df, result_av_df, result_ck_df],
+                  filename, [sheet1, sheet2, sheet3, sheet4])
 
 
 # KioskAge Report

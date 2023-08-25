@@ -26,6 +26,7 @@ SELECT
 	,COALESCE(c.Name, "No Campus")              AS  "Loc Campus/MSL Name"
 	,l.ID                                       AS	"Loc ID"
 	,COALESCE(l.Name, "Orphan Location")		AS	"Loc Name"
+	,l.LocationNumber							AS	"Loc Cost Center"
 	,l.Address                                  AS	"Loc Address"
 	,l.City                                     AS	"Loc City"
 	,l.State                                    AS	"Loc State"
