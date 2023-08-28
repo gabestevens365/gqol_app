@@ -111,6 +111,7 @@ please open PowerShell and start the SSH tunnel on port 3309.")
         return None
 
 
+# Function to connect to the Avanti Azure Synapse database
 def connect_to_avanti_database():
     from credentials.credentials_sosdb import avanti_server, avanti_database, avanti_uid, avanti_pwd
     try:
@@ -276,128 +277,90 @@ def main_menu():
         main_menu()
 
 
-# The Report Builder
-def report_builder(report_path, report_name):
-    today = date.today()
-    formatted_date = today.strftime("%Y-%m-%d")
+def generate_report_name(report_path, report_name):
+    formatted_date = date.today().strftime("%Y-%m-%d")
+    formatted_time = datetime.now().strftime("%H%M")
+    return f"{report_path}{report_name}_{formatted_date}_{formatted_time}.xlsx"
 
-    current_time = datetime.now()
-    formatted_time = current_time.strftime("%H%M")
 
-    report_date = formatted_date
-    report_time = formatted_time
-    report_ext = ".xlsx"
-    final_file_name = report_path + report_name + "_" + report_date + "_" + report_time + report_ext
-
-    print(f"{report_name} for {report_date} at {report_time}...")
-
-    # Check to see whether the file already exists, first.
-    report_exists = find_latest_report(report_path, report_name, report_date)
-    if report_exists is None:
-        print(f"Generating the first copy of {report_name} for {report_date}.")
-        if report_name == "All_Devices_Report":
-            alldevice_report_365rm_writer(final_file_name)
-        elif report_name == "KioskAge_Report":
-            kiosk_age_report_writer(final_file_name)
-        else:
-            print("There is a problem in the Report Name.")
-            main_menu()
+def generate_report(final_file_name, report_name):
+    if report_name == "All_Devices_Report":
+        alldevice_report_365rm_writer(final_file_name)
+    elif report_name == "KioskAge_Report":
+        kiosk_age_report_writer(final_file_name)
     else:
-        print(f"{report_path}{report_exists} already exists!\n")
-        choice = input("Do you want to generate a new copy? [Y/N]: ")
-        choice = choice.upper()
-
-        if choice == "Y":
-            print(f"Generating a new copy of {report_name} for {report_date}.")
-            if report_name == "All_Devices_Report":
-                alldevice_report_365rm_writer(final_file_name)
-            elif report_name == "KioskAge_Report":
-                kiosk_age_report_writer(final_file_name)
-            else:
-                print("There is a problem in the Report Name.")
-                main_menu()
-        elif choice == "N":
-            main_menu()
-        else:
-            print("Invalid Choice.")
-            main_menu()
+        print("There is a problem in the Report Name.")
+        main_menu()
 
 
-# AllDevices Report
+def report_builder(report_path, report_name):
+    formatted_date = date.today().strftime("%Y-%m-%d")
+    formatted_time = datetime.now().strftime("%H%M")
+
+    print(f"{report_name} for {formatted_date} at {formatted_time}...")
+
+    final_file_name = generate_report_name(report_path, report_name)
+
+    report_exists = find_latest_report(report_path, report_name, formatted_date)
+
+    if report_exists is None:
+        print(f"Generating the first copy of {report_name} for {formatted_date}.")
+        generate_report(final_file_name, report_name)
+        return
+
+    print(f"{report_path}{report_exists} already exists!\n")
+    choice = input("Do you want to generate a new copy? [Y/N]: ").strip().upper()
+
+    if choice == "Y":
+        print(f"Generating a new copy of {report_name} for {formatted_date}.")
+        generate_report(final_file_name, report_name)
+    elif choice == "N":
+        main_menu()
+    else:
+        print("Invalid Choice.")
+        main_menu()
+
+
+def execute_and_save_queries(db_info, filename):
+    result_dfs = []
+    sheet_names = []
+
+    for info in db_info:
+        connection = info["connect_func"]()
+        if connection is None:
+            print(f"Failed to connect to {info['name']} database.")
+            continue  # Skip this database
+
+        result_df = execute_query(connection, info["query_file"])
+
+        if result_df is None:
+            print(f"Query failed for {info['name']} database.")
+            connection.close()
+            continue  # Skip saving this result
+
+        result_dfs.append(result_df)
+        sheet_names.append(info["sheet_name"])
+        connection.close()
+
+    if result_dfs:
+        save_to_excel(result_dfs, filename, sheet_names)
+
+
 def alldevice_report_365rm_writer(filename):
-    # MySQL query
-    query_file_v5 = "./queries/All-Devices_v5.sql"
-    query_file_leg = "./queries/All-Devices_Legacy.sql"
-    query_file_av = "./queries/All-Devices_AV.sql"
-    query_file_ck = "./queries/All-Devices_CK.sql"
-    query_file_avanti = "/queries/All-Devices_Avanti.sql"
+    db_info = [
+        {"name": "v5", "connect_func": connect_to_v5_database,
+         "query_file": "./queries/All-Devices_v5.sql", "sheet_name": "All ADM-v5 Devices"},
+        {"name": "Legacy", "connect_func": connect_to_leg_database,
+         "query_file": "./queries/All-Devices_Legacy.sql", "sheet_name": "All Legacy Devices"},
+        {"name": "AirVend", "connect_func": connect_to_av_database,
+         "query_file": "./queries/All-Devices_AV.sql", "sheet_name": "All AirVend Devices"},
+        {"name": "CompanyKitchen", "connect_func": connect_to_ck_database,
+         "query_file": "./queries/All-Devices_CK.sql", "sheet_name": "All CompanyKitchen Devices"},
+        {"name": "Avanti", "connect_func": connect_to_avanti_database,
+         "query_file": "./queries/All-Devices_Avanti.sql", "sheet_name": "All Avanti Devices"}
+    ]
 
-    # Connect to the v5 database
-    connection_v5 = connect_to_v5_database()
-    if connection_v5 is None:
-        return
-
-    # Execute the v5 query
-    result_v5_df = execute_query(connection_v5, query_file_v5)
-    if result_v5_df is None:
-        connection_v5.close()
-        return
-
-    # Connect to the Legacy database
-    connection_leg = connect_to_leg_database()
-    if connection_leg is None:
-        return
-
-    # Execute the Legacy query
-    result_leg_df = execute_query(connection_leg, query_file_leg)
-    if result_leg_df is None:
-        connection_leg.close()
-        return
-
-    # Connect to the AV database
-    connection_av = connect_to_av_database()
-    if connection_av is None:
-        return
-
-    # Execute the AV query
-    result_av_df = execute_query(connection_av, query_file_av)
-    if result_av_df is None:
-        connection_av.close()
-        return
-
-    # Connect to the CompanyKitchen database
-    connection_ck = connect_to_ck_database()
-    if connection_ck is None:
-        return
-
-    # Execute the CompanyKitchen query
-    result_ck_df = execute_query(connection_ck, query_file_ck)
-    print("Don't forget to disconnect the CK SSH tunnel on 3309.")
-    if result_ck_df is None:
-        connection_ck.close()
-        return
-
-    '''
-    # Connect to the Avanti Data-Warehouse
-    connection_avanti = connect_to_avanti_database()
-    if connection_avanti is None:
-        return
-
-    # Execute the Avanti Query
-    result_avanti_df = execute_query(connection_avanti, query_file_avanti)
-    if result_avanti_df is None:
-        connection_avanti.close()
-        return
-    '''
-
-    # Save the result to an Excel file
-    sheet1 = "All ADM-v5 Devices"
-    sheet2 = "All Legacy Devices"
-    sheet3 = "All AirVend Devices"
-    sheet4 = "All CompanyKitchen Devices"
-    # sheet5 = "All Avanti Devices"
-    save_to_excel([result_v5_df, result_leg_df, result_av_df, result_ck_df],
-                  filename, [sheet1, sheet2, sheet3, sheet4])
+    execute_and_save_queries(db_info, filename)
 
 
 # KioskAge Report
