@@ -9,6 +9,7 @@ SELECT
     o.NAME                      AS	"Operation Name",
     l.NAME                      AS	"Location Name",
 	l.LocationNumber			AS	"Loc Cost Center",
+	CONCAT(l.address, ', ', l.city, ', ', l.state, ' ', l.zip) AS "Full Address",
     k.NAME                      AS	"Device Serial",
     CASE k.HWTYPE
         WHEN 'GEN3'             THEN 'Gen3'

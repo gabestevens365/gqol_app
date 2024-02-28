@@ -1,5 +1,6 @@
 -- This is the v5 Kiosk-Age and OS Version Report. This will not run in Snowflake. Use reader.365rm.us
--- This worked on 2023.06.28 - GS
+-- Version 2, 2023.12.01 -- Removed MM6 hwtypes and vshm kiosk serial prefixes. - GS
+-- Version 1, 2023.06.28 - GS
 SELECT
     COALESCE(s.VALUE, 'NONE')       AS  "Operation Group"
     ,sfe_division.value             AS	"Division"
@@ -9,6 +10,7 @@ SELECT
     ,COALESCE(o.NAME, 'Orphan Op')  AS  "Operation Name"
     ,COALESCE(l.NAME, 'Orphan Loc') AS  "Location Name"
 	,l.LocationNumber			    AS	"Loc Cost Center"
+	,CONCAT(l.address, ', ', l.city, ', ', l.state, ' ', l.zip) AS "Full Address"
     ,k.NAME                         AS  "Device Serial"
     ,CASE UPPER(k.HWTYPE)
 		WHEN 'GEN3'             THEN 'Gen3'
@@ -63,9 +65,10 @@ FROM Kiosk k
             FROM sosdb.org o
             INNER JOIN sosdb.location l ON o.ID = l.ORG
             INNER JOIN sosdb.kiosk k ON l.ID = k.LOCATION
-            WHERE
-                k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%'
-                AND k.HWTYPE NOT IN ('BEACON','MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+            WHERE k.HWTYPE NOT IN ('BEACON', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+                AND k.HWTYPE NOT LIKE 'MM6%' AND k.HWTYPE NOT LIKE 'mm6%'
+                AND (k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%')
+                AND k.NAME NOT LIKE 'VSHM%' AND k.NAME NOT LIKE 'vshm%'
         ) AS kiosk_info ON KS.ORG = kiosk_info.ORG AND KS.LOCATION = kiosk_info.LOCATION AND KS.KIOSK = kiosk_info.KIOSK
         GROUP BY KS.ORG, KS.LOCATION, KS.KIOSK
     ) KS ON o.ID = KS.ORG AND l.ID = KS.LOCATION AND k.ID = KS.KIOSK
@@ -85,8 +88,10 @@ FROM Kiosk k
         GROUP BY h.KIOSKNAME, REPLACE(JSON_EXTRACT(h.BASICINFO, '$.systemInfo'), CHAR(34), "")
     ) AS h ON k.NAME = h.KIOSKNAME
 
-WHERE k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%'
-	AND k.HWTYPE NOT IN ('BEACON','MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+WHERE k.HWTYPE NOT IN ('BEACON', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+	AND k.HWTYPE NOT LIKE 'MM6%' AND k.HWTYPE NOT LIKE 'mm6%'
+	AND (k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%')
+	AND k.NAME NOT LIKE 'VSHM%' AND k.NAME NOT LIKE 'vshm%'
 
 UNION
 SELECT
@@ -98,20 +103,25 @@ SELECT
     ,COALESCE(o.NAME, 'Orphan Op')  AS  "Operation Name"
     ,COALESCE(l.NAME, 'Orphan Loc') AS  "Location Name"
 	,l.LocationNumber				AS	"Loc Cost Center"
+	,CONCAT(l.address, ', ', l.city, ', ', l.state, ' ', l.zip) AS "Full Address"
     ,k.NAME                         AS  "Device Serial"
     ,CASE UPPER(k.HWTYPE)
+		WHEN 'BEACON'           THEN 'Beacon'
+		WHEN 'ELO PRO'          THEN 'ReadyTouch (ELO Pro)'
 		WHEN 'GEN3'             THEN 'Gen3'
 		WHEN 'GEN3C'            THEN 'Gen3'
-		WHEN 'X3'               THEN 'ReadyTouch (X3)'
-		WHEN 'SLABB'            THEN 'ReadyTouch (SLABB)'
-		WHEN 'REV.B'            THEN 'ReadyTouch (REV.B)'
-		WHEN 'ELO PRO'          THEN 'ReadyTouch (ELO Pro)'
+		WHEN 'MM6'              THEN 'MM6'
+		WHEN 'MM6-DINING'       THEN 'MM6-Dining'
+		WHEN 'MM6-MARKETS'      THEN 'MM6-Markets'
+		WHEN 'MM6-MINI-DINING'  THEN 'MM6-Mini-Dining'
+		WHEN 'MM6-MINI-MARKETS' THEN 'MM6-Mini-Markets'
 		WHEN 'NANO'             THEN 'Nano'
 		WHEN 'PICO'             THEN 'Pico'
 		WHEN 'PICO-STOCKWELL'   THEN 'Pico-Stockwell'
-		WHEN 'BEACON'           THEN 'Beacon'
-		WHEN 'MM6'              THEN 'MM6'
+		WHEN 'REV.B'            THEN 'ReadyTouch (REV.B)'
+		WHEN 'SLABB'            THEN 'ReadyTouch (SLABB)'
 		WHEN 'SODASTREAM'       THEN 'SodaStream'
+		WHEN 'X3'               THEN 'ReadyTouch (X3)'
     END                             AS "Model"
 	,k.STATUS                       AS	"Device Status"
 	,k.LastFullSync                 AS	"Device Last Sync"
@@ -146,6 +156,8 @@ FROM kiosk k
 	) sfe_division ON o.id = sfe_division.NAME
 
 WHERE location IS NULL
-	AND k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%'
-	AND k.HWTYPE NOT IN ('BEACON', 'MM6', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+	AND k.HWTYPE NOT IN ('BEACON', 'NANO', 'X3', 'SLABB', 'REV.B', 'ELO PRO')
+	AND k.HWTYPE NOT LIKE 'MM6%' AND k.HWTYPE NOT LIKE 'mm6%'
+	AND (k.NAME LIKE 'VSH%' OR k.NAME LIKE 'KSK%')
+	AND k.NAME NOT LIKE 'VSHM%' AND k.NAME NOT LIKE 'vshm%'
 ORDER BY 1, 2, 6, 7, 8;

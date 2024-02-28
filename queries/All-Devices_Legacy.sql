@@ -5,8 +5,8 @@ SELECT
 	''						AS	'Quick Ref'
 	,'365 Retail Markets'	AS	'Platform Parent'
 	,'Legacy'				AS	'Platform'
-	,ks.Grandparent			AS	'Operation Parent'
-	,ks.Operation			AS	'Operation Name'
+	,ks.Grandparent			AS	'Operator Group'
+	,ks.Operation			AS	'Operator Name'
 	,ks.LocationName		AS	'Location Name'
 	,ks.KioskSerial			AS	'Serial Number'
 	-- Information: Operation --

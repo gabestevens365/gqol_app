@@ -1,3 +1,6 @@
+-- The AMS/Avanit All-Devices Report
+-- Run in DataWarehouse
+-- Version 2. Worked on 2023.09.13
 WITH RankedKiosks AS (
     SELECT
         ''                          AS  'Quick Ref'
@@ -62,7 +65,8 @@ WITH RankedKiosks AS (
         AND l.Name NOT LIKE 'XXX%'
         AND l.NAME NOT LIKE 'zz %'
         AND l.NAME NOT LIKE 'ZZ%'
-        AND l.NAME NOT LIKE '%Test Location%'
+--        AND l.NAME NOT LIKE '%Test Location%'
+        AND k.NAME NOT LIKE 'X-%'
         AND ks.NAME != 'Inactive'
 )
 
