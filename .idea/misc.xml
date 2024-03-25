@@ -7,7 +7,7 @@
     <option name="pathToExecutable" value="C:\Users\gabe.stevens\AppData\Local\anaconda3\Scripts\black.exe" />
     <option name="sdkName" value="gqol_app" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="gqol_app" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="C:\Users\gabe.stevens\AppData\Local\anaconda3" project-jdk-type="Python SDK" />
   <component name="PyPackaging">
     <option name="earlyReleasesAsUpgrades" value="true" />
   </component>

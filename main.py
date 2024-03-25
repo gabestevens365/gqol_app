@@ -563,7 +563,7 @@ def finalize_all_devices_report():
     formatted_date = date.today().strftime("%Y-%m-%d")
     formatted_time = datetime.now().strftime("%H%M")
     report_path = "./reports/AllDevices/"
-    report_name = "All_Devices_Report"
+    report_name = "All-Devices_Report"
 
     latest_report = report_path + find_latest_report(
         report_path, report_name, formatted_date
@@ -571,8 +571,8 @@ def finalize_all_devices_report():
     print(f"Found {latest_report}")
 
     # TODO: Check to see if OperatorGroup-Specific reports have already been generated for that file, based on
-    #  filenames. All_Devices_Report_{date}.xlsx is the default, the variation is
-    #  All_Devices_Report_{date}_OperatorGroup.xlsx. If they already exist, say so and return to the menu, if not,
+    #  filenames. All-Devices_Report_{date}.xlsx is the default, the variation is
+    #  All-Devices_Report_{date}_OperatorGroup.xlsx. If they already exist, say so and return to the menu, if not,
     #  create them.
 
     # Create the "CompassGroup" variation.
@@ -612,7 +612,7 @@ def main_menu():
     choice = input("Enter your choice: ")
 
     if choice == "1":
-        report_builder("./reports/AllDevices/", "All_Devices_Report")
+        report_builder("./reports/AllDevices/", "All-Devices_Report")
     elif choice == "2":
         report_builder("./reports/KioskAge/", "KioskAge_Report")
     elif choice == "3":
@@ -632,7 +632,7 @@ def generate_report_name(report_path, report_name):
 
 
 def generate_report(final_file_name, report_name):
-    if report_name == "All_Devices_Report":
+    if report_name == "All-Devices_Report":
         alldevice_report_365rm_writer(final_file_name)
     elif report_name == "KioskAge_Report":
         kiosk_age_report_writer(final_file_name)
